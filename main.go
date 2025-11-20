@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/fmuoria/CV-Review-agent/internal/api"
 	"github.com/fmuoria/CV-Review-agent/internal/agent"
+	"github.com/fmuoria/CV-Review-agent/internal/api"
 )
 
 func main() {

@@ -26,7 +26,7 @@ func NewServer(agent *agent.CVReviewAgent) *Server {
 // Router returns the HTTP router
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
-	
+
 	mux.HandleFunc("POST /ingest", s.handleIngest)
 	mux.HandleFunc("GET /report", s.handleReport)
 	mux.HandleFunc("GET /health", s.handleHealth)

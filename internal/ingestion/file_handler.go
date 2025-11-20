@@ -63,7 +63,7 @@ func (fh *FileHandler) LoadDocuments() ([]models.ApplicantDocument, error) {
 
 		filename := file.Name()
 		ext := strings.ToLower(filepath.Ext(filename))
-		
+
 		// Only process PDF and TXT files
 		if ext != ".pdf" && ext != ".txt" && ext != ".doc" && ext != ".docx" {
 			continue
@@ -73,7 +73,7 @@ func (fh *FileHandler) LoadDocuments() ([]models.ApplicantDocument, error) {
 		// Convention: "Name_CV.pdf" or "Name_CoverLetter.pdf"
 		baseName := strings.TrimSuffix(filename, ext)
 		parts := strings.Split(baseName, "_")
-		
+
 		if len(parts) < 2 {
 			continue
 		}

@@ -35,7 +35,7 @@ func NewVertexAIClient() (*VertexAIClient, error) {
 	}
 
 	model := client.GenerativeModel("gemini-1.5-flash")
-	
+
 	// Configure model parameters
 	model.SetTemperature(0.2) // Lower temperature for more consistent scoring
 	model.SetTopK(40)

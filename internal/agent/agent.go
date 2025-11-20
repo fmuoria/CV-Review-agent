@@ -27,7 +27,7 @@ type CVReviewAgent struct {
 // NewCVReviewAgent creates a new CV review agent
 func NewCVReviewAgent() *CVReviewAgent {
 	fileHandler := ingestion.NewFileHandler("uploads")
-	
+
 	return &CVReviewAgent{
 		FileHandler: fileHandler,
 	}

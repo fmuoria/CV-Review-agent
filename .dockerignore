@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Build artifacts
+cv-review-agent
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+*.test
+*.out
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Temporary files
+uploads/
+*.log
+
+# Credentials (should never be in image)
+credentials.json
+token.json
+*.json
+!go.mod
+!go.sum
+!examples/*.json
+
+# Examples (optional - uncomment to exclude)
+# examples/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml

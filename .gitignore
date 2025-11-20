@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+cv-review-agent
 
 # Test binary, built with `go test -c`
 *.test

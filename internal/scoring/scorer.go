@@ -97,7 +97,7 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 
 	sb.WriteString("\n## APPLICANT INFORMATION\n")
 	sb.WriteString(fmt.Sprintf("Name: %s\n\n", applicant.Name))
-	
+
 	sb.WriteString("### CV CONTENT\n")
 	sb.WriteString(applicant.CVContent)
 	sb.WriteString("\n\n")
@@ -121,7 +121,7 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString(`  "cover_letter_score": <0-10>,` + "\n")
 	sb.WriteString(`  "cover_letter_reasoning": "<detailed explanation of cover letter quality and alignment>"` + "\n")
 	sb.WriteString("}\n\n")
-	
+
 	sb.WriteString("SCORING CRITERIA:\n")
 	sb.WriteString("- Experience Score (0-50): Weight heavily towards required experience. Each missing required qualification should reduce score by 10-15 points. Missing nice-to-have should reduce by 2-5 points.\n")
 	sb.WriteString("- Education Score (0-20): Required education is critical. Missing required degree should reduce score by 10+ points. Missing nice-to-have should reduce by 2-3 points.\n")

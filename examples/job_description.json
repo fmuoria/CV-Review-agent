@@ -1,0 +1,38 @@
+{
+  "title": "Senior Software Engineer",
+  "description": "We are seeking an experienced Senior Software Engineer to join our backend team. The ideal candidate will have strong expertise in Go programming, microservices architecture, and cloud technologies. You will be responsible for designing and implementing scalable backend services that power our platform.",
+  "required_experience": [
+    "5+ years of professional software development experience",
+    "3+ years of Go programming experience",
+    "Experience with microservices architecture and RESTful API design",
+    "Proven track record of building scalable backend systems",
+    "Experience with relational databases (PostgreSQL, MySQL)"
+  ],
+  "required_education": [
+    "Bachelor's degree in Computer Science, Software Engineering, or related technical field"
+  ],
+  "required_duties": [
+    "Design and implement scalable backend services and APIs",
+    "Write clean, maintainable, and well-tested code",
+    "Conduct code reviews and provide constructive feedback",
+    "Collaborate with cross-functional teams to deliver features",
+    "Troubleshoot and resolve production issues"
+  ],
+  "nice_to_have_experience": [
+    "Experience with Kubernetes and container orchestration",
+    "Cloud platform experience (GCP, AWS, or Azure)",
+    "Experience with message queues (RabbitMQ, Kafka)",
+    "Contributions to open source projects",
+    "Experience with gRPC"
+  ],
+  "nice_to_have_education": [
+    "Master's degree in Computer Science or related field",
+    "Relevant technical certifications (CKA, AWS Certified Developer)"
+  ],
+  "nice_to_have_duties": [
+    "Mentor junior developers and provide technical guidance",
+    "Contribute to technical documentation and best practices",
+    "Participate in architecture decisions and technical planning",
+    "Present technical topics to the team"
+  ]
+}

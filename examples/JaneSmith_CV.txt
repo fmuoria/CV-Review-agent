@@ -1,0 +1,58 @@
+JANE SMITH
+Software Developer
+Email: jane.smith@email.com | Phone: (555) 987-6543 | Location: Austin, TX
+LinkedIn: linkedin.com/in/janesmith | GitHub: github.com/janesmith
+
+PROFESSIONAL SUMMARY
+Motivated Software Developer with 4 years of experience in backend development. Proficient in Go and Python with a solid understanding of microservices architecture and API design. Eager to take on new challenges and expand technical expertise.
+
+TECHNICAL SKILLS
+Languages: Go, Python, JavaScript
+Frameworks: Flask, Django, Express.js
+Databases: PostgreSQL, MongoDB
+Tools: Docker, Git, Jenkins
+Cloud: Basic AWS experience
+
+WORK EXPERIENCE
+
+Software Developer | CloudTech Solutions | Austin, TX
+March 2021 - Present
+- Develop backend services using Go for cloud management platform
+- Implement RESTful APIs for frontend consumption
+- Work with PostgreSQL database for data persistence
+- Participate in agile development process and daily standups
+- Write unit tests for new features
+- Fix bugs reported by QA team
+- Technologies: Go, Docker, PostgreSQL, AWS
+
+Junior Developer | WebStart Inc. | Austin, TX
+July 2019 - February 2021
+- Built web applications using Python and Flask
+- Created database schemas and wrote SQL queries
+- Collaborated with team members on feature development
+- Learned Go programming language on the job
+- Technologies: Python, Flask, MySQL
+
+Intern | Tech Innovations | Remote
+May 2019 - June 2019
+- Assisted senior developers with coding tasks
+- Wrote basic scripts for automation
+- Participated in code reviews
+- Technologies: Python, JavaScript
+
+EDUCATION
+
+Bachelor of Science in Information Technology
+University of Texas at Austin | Graduated: 2019
+GPA: 3.5/4.0
+
+PROJECTS
+- Built a personal blog using Go and PostgreSQL
+- Created a REST API for todo list management
+- Contributed small fixes to open-source projects
+
+SKILLS
+- Good understanding of microservices concepts
+- Familiar with Docker containerization
+- Basic knowledge of CI/CD pipelines
+- Team player with good communication skills

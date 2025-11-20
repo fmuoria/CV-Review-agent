@@ -1,0 +1,27 @@
+Jane Smith
+Austin, TX
+jane.smith@email.com
+(555) 987-6543
+
+[Date]
+
+Hiring Manager
+[Company Name]
+[Company Address]
+
+Dear Hiring Manager,
+
+I am excited to apply for the Senior Software Engineer position at your company. While I have 4 years of software development experience with a strong focus on Go programming, I am eager to take the next step in my career and contribute to your team's success.
+
+In my current role at CloudTech Solutions, I have been actively developing backend services using Go and have gained practical experience with microservices architecture. I work extensively with RESTful APIs and PostgreSQL databases, and I've been fortunate to learn from experienced engineers on my team. Although I'm still building my expertise, I am a quick learner and highly motivated to grow in this role.
+
+I have a solid educational background with a Bachelor's degree in Information Technology from the University of Texas at Austin. My coursework provided a strong foundation in software development principles, and I've been continuously expanding my knowledge through hands-on experience and self-study.
+
+What attracts me to this position is the opportunity to work on more complex systems at scale and to learn from a talented team of engineers. I am particularly interested in deepening my knowledge of cloud technologies and Kubernetes, which I understand are important parts of your technology stack.
+
+I am a dedicated team player who values collaboration and is always willing to help colleagues. I believe in writing clean code and following best practices, and I'm committed to continuous improvement. While I may not have all the years of experience listed in the requirements, I am confident in my ability to learn quickly and contribute meaningfully to your team.
+
+Thank you for considering my application. I would welcome the opportunity to discuss how my skills and enthusiasm can benefit your team. I am available for an interview at your convenience and can be reached at jane.smith@email.com or (555) 987-6543.
+
+Best regards,
+Jane Smith

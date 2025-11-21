@@ -148,3 +148,170 @@ func TestSanitizeUTF8_ReplacementCharacter(t *testing.T) {
 		t.Errorf("sanitizeUTF8() did not include replacement character")
 	}
 }
+
+// TestTruncate tests the truncate helper function
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{
+			name:   "Short string not truncated",
+			input:  "Hello",
+			maxLen: 10,
+			want:   "Hello",
+		},
+		{
+			name:   "Exact length not truncated",
+			input:  "Hello",
+			maxLen: 5,
+			want:   "Hello",
+		},
+		{
+			name:   "Long string truncated",
+			input:  "This is a very long string that should be truncated",
+			maxLen: 20,
+			want:   "This is a very long ...",
+		},
+		{
+			name:   "Empty string",
+			input:  "",
+			maxLen: 10,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncate(tt.input, tt.maxLen)
+			if result != tt.want {
+				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseScores_DirectJSON tests parsing of pure JSON responses
+func TestParseScores_DirectJSON(t *testing.T) {
+	scorer := &Scorer{}
+	
+	validJSON := `{
+		"experience_score": 45.5,
+		"experience_reasoning": "Strong experience",
+		"education_score": 18.0,
+		"education_reasoning": "Excellent education",
+		"duties_score": 19.0,
+		"duties_reasoning": "Well matched",
+		"cover_letter_score": 8.5,
+		"cover_letter_reasoning": "Good cover letter"
+	}`
+
+	scores, err := scorer.parseScores(validJSON)
+	if err != nil {
+		t.Fatalf("parseScores() failed: %v", err)
+	}
+
+	if scores.ExperienceScore != 45.5 {
+		t.Errorf("ExperienceScore = %v, want 45.5", scores.ExperienceScore)
+	}
+	if scores.EducationScore != 18.0 {
+		t.Errorf("EducationScore = %v, want 18.0", scores.EducationScore)
+	}
+	if scores.DutiesScore != 19.0 {
+		t.Errorf("DutiesScore = %v, want 19.0", scores.DutiesScore)
+	}
+	if scores.CoverLetterScore != 8.5 {
+		t.Errorf("CoverLetterScore = %v, want 8.5", scores.CoverLetterScore)
+	}
+}
+
+// TestParseScores_JSONWithExtraText tests parsing of JSON with surrounding text
+func TestParseScores_JSONWithExtraText(t *testing.T) {
+	scorer := &Scorer{}
+	
+	tests := []struct {
+		name     string
+		response string
+		wantExp  float64
+		wantErr  bool
+	}{
+		{
+			name: "JSON with text before",
+			response: `Here are the scores:
+{
+	"experience_score": 40.0,
+	"experience_reasoning": "Good",
+	"education_score": 15.0,
+	"education_reasoning": "Adequate",
+	"duties_score": 18.0,
+	"duties_reasoning": "Strong",
+	"cover_letter_score": 7.0,
+	"cover_letter_reasoning": "Good"
+}`,
+			wantExp: 40.0,
+			wantErr: false,
+		},
+		{
+			name: "JSON with text after",
+			response: `{
+	"experience_score": 35.0,
+	"experience_reasoning": "Fair",
+	"education_score": 12.0,
+	"education_reasoning": "Basic",
+	"duties_score": 16.0,
+	"duties_reasoning": "Acceptable",
+	"cover_letter_score": 6.0,
+	"cover_letter_reasoning": "Average"
+}
+Hope this helps!`,
+			wantExp: 35.0,
+			wantErr: false,
+		},
+		{
+			name: "JSON with markdown code blocks",
+			response: "```json\n" + `{
+	"experience_score": 42.0,
+	"experience_reasoning": "Very good",
+	"education_score": 17.0,
+	"education_reasoning": "Strong",
+	"duties_score": 19.0,
+	"duties_reasoning": "Excellent",
+	"cover_letter_score": 9.0,
+	"cover_letter_reasoning": "Outstanding"
+}` + "\n```",
+			wantExp: 42.0,
+			wantErr: false,
+		},
+		{
+			name:     "No JSON in response",
+			response: "This response has no JSON object",
+			wantErr:  true,
+		},
+		{
+			name:     "Invalid JSON",
+			response: "{ invalid json }",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scores, err := scorer.parseScores(tt.response)
+			
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("parseScores() expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("parseScores() failed: %v", err)
+				}
+				if scores.ExperienceScore != tt.wantExp {
+					t.Errorf("ExperienceScore = %v, want %v", scores.ExperienceScore, tt.wantExp)
+				}
+			}
+		})
+	}
+}

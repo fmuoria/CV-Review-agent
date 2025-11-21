@@ -42,11 +42,17 @@ func (s *Scorer) ScoreApplicant(ctx context.Context, applicant models.ApplicantD
 	// Build the comprehensive prompt for the LLM
 	prompt := s.buildScoringPrompt(applicant, jobDesc)
 
+	// Log request details
+	log.Printf("CV length: %d bytes, Cover letter: %d bytes", len(applicant.CVContent), len(applicant.CLContent))
+	log.Printf("Sending request to Gemini 2.5 Flash...")
+
 	// Get response from LLM
 	response, err := s.llmClient.GenerateContent(ctx, prompt)
 	if err != nil {
 		return models.Scores{}, fmt.Errorf("failed to get LLM response: %w", err)
 	}
+
+	log.Printf("Response received (length: %d bytes)", len(response))
 
 	// Parse the structured response
 	scores, err := s.parseScores(response)
@@ -139,7 +145,14 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 
 	sb.WriteString("## EVALUATION INSTRUCTIONS\n")
 	sb.WriteString("Evaluate the applicant and provide scores with detailed reasoning. Missing REQUIRED qualifications should significantly impact scores, while missing NICE TO HAVE qualifications should have minimal impact.\n\n")
-	sb.WriteString("Provide your evaluation in the following JSON format:\n")
+	
+	sb.WriteString("CRITICAL OUTPUT REQUIREMENTS:\n")
+	sb.WriteString("1. Your response MUST be ONLY a valid JSON object\n")
+	sb.WriteString("2. Do NOT include any explanatory text before or after the JSON\n")
+	sb.WriteString("3. Do NOT use markdown code blocks (no ```json or ```)\n")
+	sb.WriteString("4. Return ONLY the raw JSON object starting with { and ending with }\n\n")
+	
+	sb.WriteString("REQUIRED JSON FORMAT:\n")
 	sb.WriteString("{\n")
 	sb.WriteString(`  "experience_score": <0-50>,` + "\n")
 	sb.WriteString(`  "experience_reasoning": "<detailed explanation of experience match, highlighting required vs nice-to-have>",` + "\n")
@@ -156,27 +169,40 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString("- Education Score (0-20): Required education is critical. Missing required degree should reduce score by 10+ points. Missing nice-to-have should reduce by 2-3 points.\n")
 	sb.WriteString("- Duties Score (0-20): Evaluate ability to perform required duties. Each unmet required duty should reduce score by 5-7 points.\n")
 	sb.WriteString("- Cover Letter Score (0-10): Assess quality, relevance, and alignment with role. No cover letter = 0 points.\n\n")
-	sb.WriteString("Return ONLY the JSON object, no additional text.\n")
+	sb.WriteString("NOW EVALUATE THE CANDIDATE AND RETURN ONLY THE JSON OBJECT WITH SCORES (0-100) AND REASONING.\n")
 
 	return sb.String()
 }
 
 // parseScores extracts scores from LLM response
 func (s *Scorer) parseScores(response string) (models.Scores, error) {
-	// Find JSON in response (in case there's extra text)
+	// Try direct parsing first (response is pure JSON)
+	var scores models.Scores
+	if err := json.Unmarshal([]byte(response), &scores); err == nil {
+		return scores, nil
+	}
+
+	// Try finding JSON between curly braces (response has extra text)
 	startIdx := strings.Index(response, "{")
 	endIdx := strings.LastIndex(response, "}")
 
-	if startIdx == -1 || endIdx == -1 {
-		return models.Scores{}, fmt.Errorf("no JSON found in response")
+	if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
+		return models.Scores{}, fmt.Errorf("no JSON found in response: %s", truncate(response, 200))
 	}
 
 	jsonStr := response[startIdx : endIdx+1]
 
-	var scores models.Scores
 	if err := json.Unmarshal([]byte(jsonStr), &scores); err != nil {
-		return models.Scores{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		return models.Scores{}, fmt.Errorf("failed to parse extracted JSON: %w\nExtracted: %s", err, truncate(jsonStr, 200))
 	}
 
 	return scores, nil
+}
+
+// truncate returns the first maxLen characters of s, appending "..." if truncated
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

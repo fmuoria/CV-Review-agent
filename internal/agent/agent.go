@@ -180,7 +180,6 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 		}
 
 		log.Printf("Evaluating applicant %d/%d: %s", i+1, len(documents), doc.Name)
-		
 		// Calculate progress (60-95% of total)
 		progress := baseProgress + (35 * i / len(documents))
 		a.reportProgress(progress, 100, fmt.Sprintf("Evaluating %s (%d/%d)", doc.Name, i+1, len(documents)))
@@ -239,8 +238,7 @@ func (a *CVReviewAgent) GetReport() (models.ReportResponse, error) {
 // GetResults returns the current results (thread-safe)
 func (a *CVReviewAgent) GetResults() []models.ApplicantResult {
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-	
+	defer a.mu.RUnlock()	
 	// Return a copy to prevent external modification
 	resultsCopy := make([]models.ApplicantResult, len(a.results))
 	copy(resultsCopy, a.results)

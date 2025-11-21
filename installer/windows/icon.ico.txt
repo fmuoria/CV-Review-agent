@@ -1,0 +1,10 @@
+This is a placeholder for the application icon.
+
+To add a custom icon for the Windows installer:
+1. Create or obtain a .ico file (Windows icon format)
+2. Rename this file from icon.ico.txt to icon.ico
+3. Replace the content with your actual icon file
+
+If no icon is provided, the Inno Setup compiler will use a default icon.
+
+Recommended icon sizes: 16x16, 32x32, 48x48, 256x256 pixels

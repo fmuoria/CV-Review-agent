@@ -131,10 +131,10 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 		cvContent = sanitizeUTF8(cvContent)
 		log.Printf("After sanitization: %d bytes", len(cvContent))
 	}
-	// Truncate CV to 8000 chars max
-	if len(cvContent) > 8000 {
-		log.Printf("Truncating CV for applicant: %s from %d to 8000 chars", applicant.Name, len(cvContent))
-		cvContent = cvContent[:8000] + "\n...[CV truncated for length]"
+	// Truncate CV to 15000 chars max
+	if len(cvContent) > 15000 {
+		log.Printf("Truncating CV for applicant: %s from %d to 15000 chars", applicant.Name, len(cvContent))
+		cvContent = cvContent[:15000] + "\n...[CV truncated for length]"
 	}
 	sb.WriteString(cvContent)
 	sb.WriteString("\n\n")
@@ -148,10 +148,10 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 			clContent = sanitizeUTF8(clContent)
 			log.Printf("After sanitization: %d bytes", len(clContent))
 		}
-		// Truncate cover letter to 3000 chars max
-		if len(clContent) > 3000 {
-			log.Printf("Truncating cover letter for applicant: %s from %d to 3000 chars", applicant.Name, len(clContent))
-			clContent = clContent[:3000] + "\n...[Cover letter truncated for length]"
+		// Truncate cover letter to 5000 chars max
+		if len(clContent) > 5000 {
+			log.Printf("Truncating cover letter for applicant: %s from %d to 5000 chars", applicant.Name, len(clContent))
+			clContent = clContent[:5000] + "\n...[Cover letter truncated for length]"
 		}
 		sb.WriteString(clContent)
 		sb.WriteString("\n\n")
@@ -163,13 +163,13 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString("OUTPUT: Return ONLY valid JSON (no markdown, no text):\n")
 	sb.WriteString("{\n")
 	sb.WriteString(`  "experience_score": <0-50>,` + "\n")
-	sb.WriteString(`  "experience_reasoning": "<brief explanation>",` + "\n")
+	sb.WriteString(`  "experience_reasoning": "<concise 1-2 sentence explanation>",` + "\n")
 	sb.WriteString(`  "education_score": <0-20>,` + "\n")
-	sb.WriteString(`  "education_reasoning": "<brief explanation>",` + "\n")
+	sb.WriteString(`  "education_reasoning": "<concise 1-2 sentence explanation>",` + "\n")
 	sb.WriteString(`  "duties_score": <0-20>,` + "\n")
-	sb.WriteString(`  "duties_reasoning": "<brief explanation>",` + "\n")
+	sb.WriteString(`  "duties_reasoning": "<concise 1-2 sentence explanation>",` + "\n")
 	sb.WriteString(`  "cover_letter_score": <0-10>,` + "\n")
-	sb.WriteString(`  "cover_letter_reasoning": "<brief explanation>"` + "\n")
+	sb.WriteString(`  "cover_letter_reasoning": "<concise 1-2 sentence explanation>"` + "\n")
 	sb.WriteString("}\n")
 
 	return sb.String()

@@ -39,6 +39,8 @@ type ApplicantResult struct {
 	Name   string `json:"name"`
 	Scores Scores `json:"scores"`
 	Rank   int    `json:"rank"`
+	CVPath string `json:"cv_path,omitempty"`
+	CLPath string `json:"cl_path,omitempty"`
 }
 
 // IngestRequest represents the request payload for document ingestion

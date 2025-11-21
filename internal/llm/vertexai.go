@@ -40,7 +40,7 @@ func NewVertexAIClient() (*VertexAIClient, error) {
 	model.SetTemperature(0.2) // Lower temperature for more consistent scoring
 	model.SetTopK(40)
 	model.SetTopP(0.95)
-	model.SetMaxOutputTokens(4096) // Increased to prevent truncation
+	model.SetMaxOutputTokens(8192) // Doubled to prevent truncation
 
 	return &VertexAIClient{
 		client:    client,

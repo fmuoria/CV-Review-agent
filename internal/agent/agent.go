@@ -21,9 +21,9 @@ type ProgressCallback func(current, total int, message string)
 
 // Rate limiting constants for Gemini 2.5 Flash free tier
 const (
-	requestDelay  = 4 * time.Second  // 15 requests/min = 1 every 4 seconds
-	maxRetries    = 3                // Maximum retry attempts for rate limit errors
-	retryBackoff  = 10 * time.Second // Backoff delay between retries
+	requestDelay = 4 * time.Second  // 15 requests/min = 1 every 4 seconds
+	maxRetries   = 3                // Maximum retry attempts for rate limit errors
+	retryBackoff = 10 * time.Second // Backoff delay between retries
 )
 
 // CVReviewAgent orchestrates the CV review process

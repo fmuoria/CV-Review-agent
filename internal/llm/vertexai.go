@@ -34,7 +34,7 @@ func NewVertexAIClient() (*VertexAIClient, error) {
 		return nil, fmt.Errorf("failed to create Vertex AI client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-1.5-flash")
+	model := client.GenerativeModel("gemini-2.5-flash")
 
 	// Configure model parameters
 	model.SetTemperature(0.2) // Lower temperature for more consistent scoring

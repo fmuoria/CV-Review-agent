@@ -180,9 +180,25 @@ func (s *Scorer) parseScores(response string) (models.Scores, error) {
 	log.Printf("DEBUG - Attempting to parse response (length: %d)", len(response))
 	log.Printf("DEBUG - Response preview: %s", truncate(response, 500))
 
+	// Strip markdown code blocks if present
+	cleanedResponse := response
+	if strings.Contains(response, "```json") {
+		// Remove ```json prefix and ``` suffix
+		cleanedResponse = strings.TrimSpace(response)
+		// Try to remove ```json first, if not present try just ```
+		if strings.HasPrefix(cleanedResponse, "```json") {
+			cleanedResponse = strings.TrimPrefix(cleanedResponse, "```json")
+		} else {
+			cleanedResponse = strings.TrimPrefix(cleanedResponse, "```")
+		}
+		cleanedResponse = strings.TrimSuffix(cleanedResponse, "```")
+		cleanedResponse = strings.TrimSpace(cleanedResponse)
+		log.Printf("DEBUG - Stripped markdown code blocks")
+	}
+
 	// Try direct parsing first (response is pure JSON)
 	var scores models.Scores
-	if err := json.Unmarshal([]byte(response), &scores); err == nil {
+	if err := json.Unmarshal([]byte(cleanedResponse), &scores); err == nil {
 		log.Printf("DEBUG - Direct JSON parse successful: Exp=%.2f, Edu=%.2f, Duties=%.2f, CL=%.2f",
 			scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 		return scores, nil
@@ -191,14 +207,14 @@ func (s *Scorer) parseScores(response string) (models.Scores, error) {
 	}
 
 	// Try finding JSON between curly braces (response has extra text)
-	startIdx := strings.Index(response, "{")
-	endIdx := strings.LastIndex(response, "}")
+	startIdx := strings.Index(cleanedResponse, "{")
+	endIdx := strings.LastIndex(cleanedResponse, "}")
 
 	if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
 		return models.Scores{}, fmt.Errorf("no JSON found in response: %s", truncate(response, 200))
 	}
 
-	jsonStr := response[startIdx : endIdx+1]
+	jsonStr := cleanedResponse[startIdx : endIdx+1]
 
 	if err := json.Unmarshal([]byte(jsonStr), &scores); err != nil {
 		log.Printf("DEBUG - Extracted JSON parse failed: %v", err)

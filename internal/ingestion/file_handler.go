@@ -3,6 +3,7 @@ package ingestion
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,12 +94,26 @@ func (fh *FileHandler) LoadDocuments() ([]models.ApplicantDocument, error) {
 			return nil, fmt.Errorf("failed to read file %s: %w", filename, err)
 		}
 
+		// Convert to string and check if it's binary data
+		contentStr := string(content)
+
+		// Try to extract text from PDFs/DOCX if binary
+		if IsBinaryData(contentStr) {
+			extractedText, err := ExtractText(filePath)
+			if err != nil {
+				log.Printf("WARNING: Failed to extract text from %s: %v", filename, err)
+				log.Printf("Skipping binary file: %s", filename)
+				continue // Skip this file entirely
+			}
+			contentStr = extractedText
+		}
+
 		// Determine if it's a CV or cover letter
 		if strings.Contains(docType, "cv") || strings.Contains(docType, "resume") {
-			applicantFiles[applicantName].CVContent = string(content)
+			applicantFiles[applicantName].CVContent = contentStr
 			applicantFiles[applicantName].CVPath = filePath
 		} else if strings.Contains(docType, "cover") || strings.Contains(docType, "letter") || strings.Contains(docType, "cl") {
-			applicantFiles[applicantName].CLContent = string(content)
+			applicantFiles[applicantName].CLContent = contentStr
 			applicantFiles[applicantName].CLPath = filePath
 		}
 	}

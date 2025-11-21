@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,13 @@ import (
 
 // ProgressCallback is called to report progress during processing
 type ProgressCallback func(current, total int, message string)
+
+// Rate limiting constants for Gemini 2.5 Flash free tier
+const (
+	requestDelay  = 4 * time.Second  // 15 requests/min = 1 every 4 seconds
+	maxRetries    = 3                // Maximum retry attempts for rate limit errors
+	retryBackoff  = 10 * time.Second // Backoff delay between retries
+)
 
 // CVReviewAgent orchestrates the CV review process
 type CVReviewAgent struct {
@@ -166,6 +174,18 @@ func (a *CVReviewAgent) IngestFromGmailWithContext(ctx context.Context, subject 
 	return a.processApplicants(ctx, documents)
 }
 
+// isRateLimitError detects if an error is due to rate limiting
+func isRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "ResourceExhausted") ||
+		strings.Contains(errMsg, "429") ||
+		strings.Contains(errMsg, "rate limit") ||
+		strings.Contains(errMsg, "quota")
+}
+
 // processApplicants evaluates all applicants and generates rankings
 func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []models.ApplicantDocument) error {
 	results := make([]models.ApplicantResult, 0, len(documents))
@@ -185,18 +205,50 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 		progress := baseProgress + (35 * i / len(documents))
 		a.reportProgress(progress, 100, fmt.Sprintf("Evaluating %s (%d/%d)", doc.Name, i+1, len(documents)))
 
-		scores, err := a.scorer.ScoreApplicant(ctx, doc, a.jobDesc)
-		if err != nil {
+		// Score the applicant with retry logic
+		var scores models.Scores
+		var err error
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			scores, err = a.scorer.ScoreApplicant(ctx, doc, a.jobDesc)
+
+			if err == nil {
+				// Success!
+				log.Printf("Successfully scored: %s - Total: %.2f (Exp: %.2f, Edu: %.2f, Duties: %.2f, CL: %.2f)",
+					doc.Name, scores.TotalScore, scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
+				break
+			}
+
+			// Check if it's a rate limit error
+			if isRateLimitError(err) {
+				if attempt < maxRetries-1 {
+					log.Printf("Rate limit hit for %s, retrying in %v (attempt %d/%d)",
+						doc.Name, retryBackoff, attempt+1, maxRetries)
+					a.reportProgress(progress, 100, fmt.Sprintf("Rate limit - retrying %s (attempt %d/%d)", doc.Name, attempt+1, maxRetries))
+					time.Sleep(retryBackoff)
+					continue
+				}
+			}
+
+			// Other errors or max retries reached - log and skip
 			log.Printf("Failed to score applicant %s: %v", doc.Name, err)
-			// Continue with next applicant
-			continue
+			break
 		}
 
-		result := models.ApplicantResult{
-			Name:   doc.Name,
-			Scores: scores,
+		if err == nil {
+			result := models.ApplicantResult{
+				Name:   doc.Name,
+				Scores: scores,
+			}
+			results = append(results, result)
 		}
-		results = append(results, result)
+
+		// Rate limiting delay between requests (skip after last applicant)
+		if i < len(documents)-1 {
+			log.Printf("Rate limit delay (%v) before next applicant...", requestDelay)
+			a.reportProgress(progress, 100, fmt.Sprintf("Rate limit delay before next applicant..."))
+			time.Sleep(requestDelay)
+		}
 	}
 
 	a.reportProgress(95, 100, "Ranking candidates...")

@@ -473,38 +473,42 @@ func (a *App) handleProcess() {
 
 	// Set progress callback
 	a.agent.SetProgressCallback(func(current, total int, message string) {
-		a.progressBar.SetValue(float64(current) / float64(total))
-		a.progressLabel.SetText(message)
+		fyne.Do(func() {
+			a.progressBar.SetValue(float64(current) / float64(total))
+			a.progressLabel.SetText(message)
+		})
 	})
 
 	// Process in background
 	go func() {
 		err := a.agent.IngestFromGmailWithContext(a.ctx, a.subjectEntry.Text, string(jobDescJSON))
 
-		// Re-enable buttons on UI thread
-		a.processBtn.Enable()
-		a.cancelBtn.Disable()
+		// Wrap ALL UI updates in fyne.Do()
+		fyne.Do(func() {
+			a.processBtn.Enable()
+			a.cancelBtn.Disable()
 
-		if err != nil {
-			if err == context.Canceled {
-				a.progressLabel.SetText("Processing canceled")
-			} else {
-				a.progressLabel.SetText("Error: " + err.Error())
-				dialog.ShowError(err, a.mainWindow)
+			if err != nil {
+				if err == context.Canceled {
+					a.progressLabel.SetText("Processing canceled")
+				} else {
+					a.progressLabel.SetText("Error: " + err.Error())
+					dialog.ShowError(err, a.mainWindow)
+				}
+				return
 			}
-			return
-		}
 
-		// Get results
-		a.results = a.agent.GetResults()
-		a.resultsTable.Refresh()
-		a.exportBtn.Enable()
+			// Get results and update UI
+			a.results = a.agent.GetResults()
+			a.resultsTable.Refresh()
+			a.exportBtn.Enable()
 
-		a.progressLabel.SetText(fmt.Sprintf("Complete! Processed %d candidates", len(a.results)))
+			a.progressLabel.SetText(fmt.Sprintf("Complete! Processed %d candidates", len(a.results)))
 
-		fyne.CurrentApp().SendNotification(&fyne.Notification{
-			Title:   "Processing Complete",
-			Content: fmt.Sprintf("Successfully processed %d candidates", len(a.results)),
+			fyne.CurrentApp().SendNotification(&fyne.Notification{
+				Title:   "Processing Complete",
+				Content: fmt.Sprintf("Successfully processed %d candidates", len(a.results)),
+			})
 		})
 	}()
 }
@@ -513,7 +517,9 @@ func (a *App) handleProcess() {
 func (a *App) handleCancel() {
 	if a.cancelFunc != nil {
 		a.cancelFunc()
-		a.progressLabel.SetText("Canceling...")
+		fyne.Do(func() {
+			a.progressLabel.SetText("Canceling...")
+		})
 	}
 }
 

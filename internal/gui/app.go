@@ -21,6 +21,11 @@ import (
 	"github.com/fmuoria/CV-Review-agent/internal/models"
 )
 
+const (
+	// gmailCredentialsFilename is the expected filename for Gmail API credentials
+	gmailCredentialsFilename = "credentials.json"
+)
+
 // App represents the main GUI application
 type App struct {
 	fyneApp    fyne.App
@@ -321,11 +326,11 @@ func (a *App) handleAuthenticate() {
 	// Check if credentials file exists
 	credsPath := a.config.GmailCredentialsPath
 	if credsPath == "" {
-		credsPath = "credentials.json"
+		credsPath = gmailCredentialsFilename
 	}
 
 	if _, err := os.Stat(credsPath); os.IsNotExist(err) {
-		dialog.ShowError(fmt.Errorf("credentials.json not found. Please configure Gmail credentials in Settings"), a.mainWindow)
+		dialog.ShowError(fmt.Errorf("%s not found. Please configure Gmail credentials in Settings", gmailCredentialsFilename), a.mainWindow)
 		return
 	}
 
@@ -342,9 +347,9 @@ func (a *App) handleAuthenticate() {
 	go func() {
 		// Handle credentials path - Gmail handler expects credentials.json in current directory
 		needsCleanup := false
-		if credsPath != "credentials.json" {
+		if credsPath != gmailCredentialsFilename {
 			// Temporarily copy credentials to current directory for Gmail handler
-			if _, err := os.Stat("credentials.json"); os.IsNotExist(err) {
+			if _, err := os.Stat(gmailCredentialsFilename); os.IsNotExist(err) {
 				data, err := os.ReadFile(credsPath)
 				if err != nil {
 					log.Printf("Failed to read credentials from %s: %v", credsPath, err)
@@ -356,8 +361,8 @@ func (a *App) handleAuthenticate() {
 					return
 				}
 
-				if err := os.WriteFile("credentials.json", data, 0600); err != nil {
-					log.Printf("Failed to write temporary credentials.json: %v", err)
+				if err := os.WriteFile(gmailCredentialsFilename, data, 0600); err != nil {
+					log.Printf("Failed to write temporary %s: %v", gmailCredentialsFilename, err)
 					fyne.Do(func() {
 						progressDialog.Hide()
 						a.authenticateBtn.Enable()
@@ -377,10 +382,10 @@ func (a *App) handleAuthenticate() {
 
 		_, err := ingestion.NewGmailHandlerWithCallback(uploadsDir, nil)
 
-		// Clean up temporary credentials.json if we created it
+		// Clean up temporary credentials file if we created it
 		if needsCleanup {
-			if err := os.Remove("credentials.json"); err != nil {
-				log.Printf("Warning: Failed to clean up temporary credentials.json: %v", err)
+			if err := os.Remove(gmailCredentialsFilename); err != nil {
+				log.Printf("Warning: Failed to clean up temporary %s: %v", gmailCredentialsFilename, err)
 			}
 		}
 

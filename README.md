@@ -2,11 +2,20 @@
 
 A Go-based intelligent CV Review Agent that uses Google's VertexAI Gemini LLM to evaluate job applicants against a job description. The agent ingests CVs and cover letters from local uploads or Gmail, matches them intelligently, and provides detailed scoring and ranking.
 
+**Available in two versions:**
+- **Desktop GUI Application** - User-friendly graphical interface for Windows (see [GUI_README.md](GUI_README.md))
+- **HTTP API Server** - RESTful API for integration with other systems (documented below)
+
 ## Features
 
+- **Multiple Interfaces**:
+  - Desktop GUI application with visual progress tracking (Windows-optimized)
+  - HTTP API server for programmatic access and integration
+  
 - **Multiple Ingestion Methods**:
   - Local file upload via HTTP API
   - Gmail inbox integration with subject-based filtering
+  - Batch processing of 500+ emails with pagination
   
 - **Intelligent Document Matching**:
   - Automatically matches CVs to cover letters using filename conventions
@@ -27,6 +36,7 @@ A Go-based intelligent CV Review Agent that uses Google's VertexAI Gemini LLM to
   - Comprehensive reasoning for each score component
   - Ranked applicant list by total score
   - JSON API for easy integration
+  - Excel export with color-coded results and detailed analysis
 
 ## Prerequisites
 

@@ -213,7 +213,25 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 			scores, err = a.scorer.ScoreApplicant(ctx, doc, a.jobDesc)
 
 			if err == nil {
-				// Success!
+				// Check if we got an empty response (all scores are zero)
+				if scores.ExperienceScore == 0 && scores.EducationScore == 0 && 
+				   scores.DutiesScore == 0 && scores.CoverLetterScore == 0 &&
+				   scores.ExperienceReasoning == "" {
+					// Empty response detected
+					if attempt < maxRetries-1 {
+						log.Printf("Empty response received for %s, retrying (attempt %d/%d)",
+							doc.Name, attempt+1, maxRetries)
+						a.reportProgress(progress, 100, fmt.Sprintf("Empty response - retrying %s (attempt %d/%d)", doc.Name, attempt+1, maxRetries))
+						time.Sleep(retryBackoff)
+						continue
+					} else {
+						log.Printf("Empty response for %s after %d attempts, skipping", doc.Name, maxRetries)
+						err = fmt.Errorf("empty response after %d retries", maxRetries)
+						break
+					}
+				}
+				
+				// Success with valid scores!
 				log.Printf("Successfully scored: %s - Total: %.2f (Exp: %.2f, Edu: %.2f, Duties: %.2f, CL: %.2f)",
 					doc.Name, scores.TotalScore, scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 				break

@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/nguyenthenguyen/docx"
 )
 
 const (
@@ -50,7 +52,7 @@ func extractPDF(filePath string) (string, error) {
 	return text, nil
 }
 
-// extractDOCX extracts text from DOCX using antiword (for .doc) or requires manual conversion
+// extractDOCX extracts text from DOCX using antiword (for .doc) or docx library (for .docx)
 func extractDOCX(filePath string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
@@ -64,8 +66,25 @@ func extractDOCX(filePath string) (string, error) {
 		return string(output), nil
 	}
 
-	// For .docx, we'd need a Go library - for now return error with helpful message
-	return "", fmt.Errorf("DOCX extraction not yet implemented. Please convert to PDF or TXT first: %s", filePath)
+	// For .docx files, use the docx library
+	if ext == ".docx" {
+		r, err := docx.ReadDocxFile(filePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open DOCX file: %w", err)
+		}
+		defer r.Close()
+
+		doc := r.Editable()
+		text := doc.GetContent()
+
+		if len(text) < MinExtractedTextLength {
+			return "", fmt.Errorf("extracted text is too short (likely failed extraction) from: %s", filePath)
+		}
+
+		return text, nil
+	}
+
+	return "", fmt.Errorf("unsupported document format: %s", ext)
 }
 
 // IsBinaryData checks if content appears to be binary (PDF/ZIP markers)

@@ -1,7 +1,11 @@
 package export
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fmuoria/CV-Review-agent/internal/models"
@@ -12,6 +16,14 @@ import (
 func ExportToExcel(results []models.ApplicantResult, jobDesc models.JobDescription, outputPath string) error {
 	f := excelize.NewFile()
 	defer f.Close()
+
+	// Ensure output path has .xlsx extension
+	if !strings.HasSuffix(strings.ToLower(outputPath), ".xlsx") {
+		outputPath = outputPath + ".xlsx"
+	}
+
+	// Clean the path for cross-platform compatibility (Windows paths)
+	outputPath = filepath.Clean(outputPath)
 
 	// Create sheets
 	summarySheet := "Summary"
@@ -37,9 +49,18 @@ func ExportToExcel(results []models.ApplicantResult, jobDesc models.JobDescripti
 		return fmt.Errorf("failed to create detailed analysis sheet: %w", err)
 	}
 
-	// Save the file
+	// Try to save the file directly
 	if err := f.SaveAs(outputPath); err != nil {
-		return fmt.Errorf("failed to save Excel file: %w", err)
+		// If direct save fails, try buffer write fallback
+		var buf bytes.Buffer
+		if writeErr := f.Write(&buf); writeErr != nil {
+			return fmt.Errorf("failed to write Excel file to buffer: %w", writeErr)
+		}
+
+		// Write buffer to file
+		if fileErr := os.WriteFile(outputPath, buf.Bytes(), 0644); fileErr != nil {
+			return fmt.Errorf("failed to save Excel file (direct save error: %v, buffer write error: %w)", err, fileErr)
+		}
 	}
 
 	return nil

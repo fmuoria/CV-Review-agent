@@ -37,6 +37,38 @@ func sanitizeUTF8(s string) string {
 	return strings.ToValidUTF8(s, "�")
 }
 
+// condenseRequirements summarizes a list of requirements into top N items
+// This reduces prompt length while preserving key information
+func (s *Scorer) condenseRequirements(category string, items []string, maxItems int) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s: ", category))
+
+	// Take top N items or all if less than N
+	count := len(items)
+	if count > maxItems {
+		count = maxItems
+	}
+
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(items[i])
+	}
+
+	// Indicate if items were truncated
+	if len(items) > maxItems {
+		sb.WriteString(fmt.Sprintf(" (+%d more)", len(items)-maxItems))
+	}
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
 // ScoreApplicant evaluates an applicant against a job description
 func (s *Scorer) ScoreApplicant(ctx context.Context, applicant models.ApplicantDocument, jobDesc models.JobDescription) (models.Scores, error) {
 	// Build the comprehensive prompt for the LLM
@@ -75,102 +107,70 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 
 	sb.WriteString("## JOB DESCRIPTION\n")
 	sb.WriteString(fmt.Sprintf("Title: %s\n", jobDesc.Title))
-	sb.WriteString(fmt.Sprintf("Description: %s\n\n", jobDesc.Description))
+	sb.WriteString(fmt.Sprintf("Description: %s\n\n", truncate(jobDesc.Description, 500)))
 
+	// Condense requirements to 3-5 key points each instead of listing all items
 	sb.WriteString("### REQUIRED QUALIFICATIONS (Must Have - Higher Weight)\n")
-	if len(jobDesc.RequiredExperience) > 0 {
-		sb.WriteString("Required Experience:\n")
-		for _, exp := range jobDesc.RequiredExperience {
-			sb.WriteString(fmt.Sprintf("- %s\n", exp))
-		}
-	}
-	if len(jobDesc.RequiredEducation) > 0 {
-		sb.WriteString("Required Education:\n")
-		for _, edu := range jobDesc.RequiredEducation {
-			sb.WriteString(fmt.Sprintf("- %s\n", edu))
-		}
-	}
-	if len(jobDesc.RequiredDuties) > 0 {
-		sb.WriteString("Required Duties:\n")
-		for _, duty := range jobDesc.RequiredDuties {
-			sb.WriteString(fmt.Sprintf("- %s\n", duty))
-		}
-	}
+	sb.WriteString(s.condenseRequirements("Experience", jobDesc.RequiredExperience, 3))
+	sb.WriteString(s.condenseRequirements("Education", jobDesc.RequiredEducation, 3))
+	sb.WriteString(s.condenseRequirements("Duties", jobDesc.RequiredDuties, 3))
 
 	sb.WriteString("\n### NICE TO HAVE QUALIFICATIONS (Optional - Lower Weight)\n")
-	if len(jobDesc.NiceToHaveExperience) > 0 {
-		sb.WriteString("Nice to Have Experience:\n")
-		for _, exp := range jobDesc.NiceToHaveExperience {
-			sb.WriteString(fmt.Sprintf("- %s\n", exp))
-		}
-	}
-	if len(jobDesc.NiceToHaveEducation) > 0 {
-		sb.WriteString("Nice to Have Education:\n")
-		for _, edu := range jobDesc.NiceToHaveEducation {
-			sb.WriteString(fmt.Sprintf("- %s\n", edu))
-		}
-	}
-	if len(jobDesc.NiceToHaveDuties) > 0 {
-		sb.WriteString("Nice to Have Duties:\n")
-		for _, duty := range jobDesc.NiceToHaveDuties {
-			sb.WriteString(fmt.Sprintf("- %s\n", duty))
-		}
-	}
+	sb.WriteString(s.condenseRequirements("Experience", jobDesc.NiceToHaveExperience, 2))
+	sb.WriteString(s.condenseRequirements("Education", jobDesc.NiceToHaveEducation, 2))
+	sb.WriteString(s.condenseRequirements("Duties", jobDesc.NiceToHaveDuties, 2))
 
 	sb.WriteString("\n## APPLICANT INFORMATION\n")
 	sb.WriteString(fmt.Sprintf("Name: %s\n\n", applicant.Name))
 
 	sb.WriteString("### CV CONTENT\n")
-	// Sanitize CV content to prevent UTF-8 encoding errors
+	// Sanitize and truncate CV content to prevent UTF-8 encoding errors and excessive length
 	cvContent := applicant.CVContent
 	if !utf8.ValidString(cvContent) {
 		log.Printf("Sanitizing invalid UTF-8 in CV for applicant: %s (length: %d bytes)", applicant.Name, len(cvContent))
 		cvContent = sanitizeUTF8(cvContent)
 		log.Printf("After sanitization: %d bytes", len(cvContent))
 	}
+	// Truncate CV to 8000 chars max
+	if len(cvContent) > 8000 {
+		log.Printf("Truncating CV for applicant: %s from %d to 8000 chars", applicant.Name, len(cvContent))
+		cvContent = cvContent[:8000] + "\n...[CV truncated for length]"
+	}
 	sb.WriteString(cvContent)
 	sb.WriteString("\n\n")
 
 	if applicant.CLContent != "" {
 		sb.WriteString("### COVER LETTER CONTENT\n")
-		// Sanitize cover letter content to prevent UTF-8 encoding errors
+		// Sanitize and truncate cover letter content
 		clContent := applicant.CLContent
 		if !utf8.ValidString(clContent) {
 			log.Printf("Sanitizing invalid UTF-8 in cover letter for applicant: %s (length: %d bytes)", applicant.Name, len(clContent))
 			clContent = sanitizeUTF8(clContent)
 			log.Printf("After sanitization: %d bytes", len(clContent))
 		}
+		// Truncate cover letter to 3000 chars max
+		if len(clContent) > 3000 {
+			log.Printf("Truncating cover letter for applicant: %s from %d to 3000 chars", applicant.Name, len(clContent))
+			clContent = clContent[:3000] + "\n...[Cover letter truncated for length]"
+		}
 		sb.WriteString(clContent)
 		sb.WriteString("\n\n")
 	}
 
-	sb.WriteString("## EVALUATION INSTRUCTIONS\n")
-	sb.WriteString("Evaluate the applicant and provide scores with detailed reasoning. Missing REQUIRED qualifications should significantly impact scores, while missing NICE TO HAVE qualifications should have minimal impact.\n\n")
+	sb.WriteString("## EVALUATION\n")
+	sb.WriteString("Score the applicant. Missing REQUIRED items = major deductions. Missing NICE TO HAVE = minor impact.\n\n")
 
-	sb.WriteString("CRITICAL OUTPUT REQUIREMENTS:\n")
-	sb.WriteString("1. Your response MUST be ONLY a valid JSON object\n")
-	sb.WriteString("2. Do NOT include any explanatory text before or after the JSON\n")
-	sb.WriteString("3. Do NOT use markdown code blocks (no ```json or ```)\n")
-	sb.WriteString("4. Return ONLY the raw JSON object starting with { and ending with }\n\n")
-
-	sb.WriteString("REQUIRED JSON FORMAT:\n")
+	sb.WriteString("OUTPUT: Return ONLY valid JSON (no markdown, no text):\n")
 	sb.WriteString("{\n")
 	sb.WriteString(`  "experience_score": <0-50>,` + "\n")
-	sb.WriteString(`  "experience_reasoning": "<detailed explanation of experience match, highlighting required vs nice-to-have>",` + "\n")
+	sb.WriteString(`  "experience_reasoning": "<brief explanation>",` + "\n")
 	sb.WriteString(`  "education_score": <0-20>,` + "\n")
-	sb.WriteString(`  "education_reasoning": "<detailed explanation of education match, highlighting required vs nice-to-have>",` + "\n")
+	sb.WriteString(`  "education_reasoning": "<brief explanation>",` + "\n")
 	sb.WriteString(`  "duties_score": <0-20>,` + "\n")
-	sb.WriteString(`  "duties_reasoning": "<detailed explanation of duties/responsibilities match>",` + "\n")
+	sb.WriteString(`  "duties_reasoning": "<brief explanation>",` + "\n")
 	sb.WriteString(`  "cover_letter_score": <0-10>,` + "\n")
-	sb.WriteString(`  "cover_letter_reasoning": "<detailed explanation of cover letter quality and alignment>"` + "\n")
-	sb.WriteString("}\n\n")
-
-	sb.WriteString("SCORING CRITERIA:\n")
-	sb.WriteString("- Experience Score (0-50): Weight heavily towards required experience. Each missing required qualification should reduce score by 10-15 points. Missing nice-to-have should reduce by 2-5 points.\n")
-	sb.WriteString("- Education Score (0-20): Required education is critical. Missing required degree should reduce score by 10+ points. Missing nice-to-have should reduce by 2-3 points.\n")
-	sb.WriteString("- Duties Score (0-20): Evaluate ability to perform required duties. Each unmet required duty should reduce score by 5-7 points.\n")
-	sb.WriteString("- Cover Letter Score (0-10): Assess quality, relevance, and alignment with role. No cover letter = 0 points.\n\n")
-	sb.WriteString("NOW EVALUATE THE CANDIDATE AND RETURN ONLY THE JSON OBJECT WITH SCORES (0-100) AND REASONING.\n")
+	sb.WriteString(`  "cover_letter_reasoning": "<brief explanation>"` + "\n")
+	sb.WriteString("}\n")
 
 	return sb.String()
 }

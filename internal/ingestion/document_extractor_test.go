@@ -162,15 +162,16 @@ func TestExtractText_UnsupportedType(t *testing.T) {
 	}
 }
 
-// TestExtractText_DOCX tests that DOCX returns appropriate error message
+// TestExtractText_DOCX tests that DOCX extraction attempts to process file
 func TestExtractText_DOCX(t *testing.T) {
-	// DOCX extraction is not implemented, should return helpful error
+	// DOCX extraction will fail for non-existent files, but should not return "not implemented" error
 	_, err := ExtractText("test.docx")
 	if err == nil {
-		t.Error("ExtractText() should return error for .docx files (not implemented)")
+		t.Error("ExtractText() should return error for non-existent .docx file")
 	}
-	if !strings.Contains(err.Error(), "DOCX extraction not yet implemented") {
-		t.Errorf("Error should mention DOCX not implemented, got: %v", err)
+	// Should fail with "failed to open" or similar, not "not implemented"
+	if strings.Contains(err.Error(), "not yet implemented") {
+		t.Errorf("Error should not mention 'not implemented' anymore, got: %v", err)
 	}
 }
 

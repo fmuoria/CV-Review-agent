@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/fmuoria/CV-Review-agent/internal/models"
 )
 
 // TestSanitizeUTF8_ValidString tests that valid UTF-8 strings are returned unchanged
@@ -224,6 +226,139 @@ func TestParseScores_DirectJSON(t *testing.T) {
 	}
 	if scores.CoverLetterScore != 8.5 {
 		t.Errorf("CoverLetterScore = %v, want 8.5", scores.CoverLetterScore)
+	}
+}
+
+// TestCondenseRequirements tests requirement condensing logic
+func TestCondenseRequirements(t *testing.T) {
+	scorer := &Scorer{}
+
+	tests := []struct {
+		name     string
+		category string
+		items    []string
+		maxItems int
+		want     string
+	}{
+		{
+			name:     "Empty list",
+			category: "Experience",
+			items:    []string{},
+			maxItems: 3,
+			want:     "",
+		},
+		{
+			name:     "Less than max items",
+			category: "Education",
+			items:    []string{"Bachelor's degree", "Master's degree"},
+			maxItems: 3,
+			want:     "Education: Bachelor's degree; Master's degree\n",
+		},
+		{
+			name:     "Exactly max items",
+			category: "Duties",
+			items:    []string{"Task 1", "Task 2", "Task 3"},
+			maxItems: 3,
+			want:     "Duties: Task 1; Task 2; Task 3\n",
+		},
+		{
+			name:     "More than max items",
+			category: "Experience",
+			items:    []string{"Exp 1", "Exp 2", "Exp 3", "Exp 4", "Exp 5"},
+			maxItems: 3,
+			want:     "Experience: Exp 1; Exp 2; Exp 3 (+2 more)\n",
+		},
+		{
+			name:     "Single item",
+			category: "Education",
+			items:    []string{"PhD in Computer Science"},
+			maxItems: 3,
+			want:     "Education: PhD in Computer Science\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := scorer.condenseRequirements(tt.category, tt.items, tt.maxItems)
+			if result != tt.want {
+				t.Errorf("condenseRequirements() = %q, want %q", result, tt.want)
+			}
+		})
+	}
+}
+
+// TestBuildScoringPrompt_ContentTruncation tests that CV and cover letter are truncated
+func TestBuildScoringPrompt_ContentTruncation(t *testing.T) {
+	scorer := &Scorer{}
+
+	// Create long CV content (> 8000 chars)
+	longCV := strings.Repeat("This is CV content. ", 500) // ~10,000 chars
+	longCL := strings.Repeat("This is cover letter content. ", 150) // ~4,500 chars
+
+	applicant := models.ApplicantDocument{
+		Name:      "John Doe",
+		CVContent: longCV,
+		CLContent: longCL,
+	}
+
+	jobDesc := models.JobDescription{
+		Title:              "Software Engineer",
+		Description:        "A great job",
+		RequiredExperience: []string{"Go", "Python", "Java"},
+	}
+
+	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
+
+	// Check that CV was truncated
+	if !strings.Contains(prompt, "[CV truncated for length]") {
+		t.Error("Expected CV to be truncated but truncation message not found")
+	}
+
+	// Check that cover letter was truncated
+	if !strings.Contains(prompt, "[Cover letter truncated for length]") {
+		t.Error("Expected cover letter to be truncated but truncation message not found")
+	}
+
+	// Ensure prompt is reasonably sized (should be much less than original content)
+	if len(prompt) > 15000 {
+		t.Errorf("Prompt still too long: %d bytes", len(prompt))
+	}
+}
+
+// TestBuildScoringPrompt_NoTruncationNeeded tests that short content is not truncated
+func TestBuildScoringPrompt_NoTruncationNeeded(t *testing.T) {
+	scorer := &Scorer{}
+
+	applicant := models.ApplicantDocument{
+		Name:      "Jane Smith",
+		CVContent: "Short CV content",
+		CLContent: "Short cover letter",
+	}
+
+	jobDesc := models.JobDescription{
+		Title:              "Data Analyst",
+		Description:        "Analyze data",
+		RequiredExperience: []string{"SQL", "Excel"},
+	}
+
+	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
+
+	// Check that content was NOT truncated
+	if strings.Contains(prompt, "[CV truncated for length]") {
+		t.Error("CV should not be truncated for short content")
+	}
+
+	if strings.Contains(prompt, "[Cover letter truncated for length]") {
+		t.Error("Cover letter should not be truncated for short content")
+	}
+
+	// Ensure original content is present
+	if !strings.Contains(prompt, "Short CV content") {
+		t.Error("Original CV content not found in prompt")
+	}
+
+	if !strings.Contains(prompt, "Short cover letter") {
+		t.Error("Original cover letter content not found in prompt")
 	}
 }
 

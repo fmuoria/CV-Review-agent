@@ -196,7 +196,7 @@ func TestTruncate(t *testing.T) {
 // TestParseScores_DirectJSON tests parsing of pure JSON responses
 func TestParseScores_DirectJSON(t *testing.T) {
 	scorer := &Scorer{}
-	
+
 	validJSON := `{
 		"experience_score": 45.5,
 		"experience_reasoning": "Strong experience",
@@ -230,7 +230,7 @@ func TestParseScores_DirectJSON(t *testing.T) {
 // TestParseScores_JSONWithExtraText tests parsing of JSON with surrounding text
 func TestParseScores_JSONWithExtraText(t *testing.T) {
 	scorer := &Scorer{}
-	
+
 	tests := []struct {
 		name     string
 		response string
@@ -299,7 +299,7 @@ Hope this helps!`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			scores, err := scorer.parseScores(tt.response)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("parseScores() expected error but got none")

@@ -53,6 +53,7 @@ func (s *Scorer) ScoreApplicant(ctx context.Context, applicant models.ApplicantD
 	}
 
 	log.Printf("Response received (length: %d bytes)", len(response))
+	log.Printf("DEBUG - Raw LLM Response:\n%s", response)
 
 	// Parse the structured response
 	scores, err := s.parseScores(response)
@@ -145,13 +146,13 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 
 	sb.WriteString("## EVALUATION INSTRUCTIONS\n")
 	sb.WriteString("Evaluate the applicant and provide scores with detailed reasoning. Missing REQUIRED qualifications should significantly impact scores, while missing NICE TO HAVE qualifications should have minimal impact.\n\n")
-	
+
 	sb.WriteString("CRITICAL OUTPUT REQUIREMENTS:\n")
 	sb.WriteString("1. Your response MUST be ONLY a valid JSON object\n")
 	sb.WriteString("2. Do NOT include any explanatory text before or after the JSON\n")
 	sb.WriteString("3. Do NOT use markdown code blocks (no ```json or ```)\n")
 	sb.WriteString("4. Return ONLY the raw JSON object starting with { and ending with }\n\n")
-	
+
 	sb.WriteString("REQUIRED JSON FORMAT:\n")
 	sb.WriteString("{\n")
 	sb.WriteString(`  "experience_score": <0-50>,` + "\n")
@@ -176,10 +177,17 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 
 // parseScores extracts scores from LLM response
 func (s *Scorer) parseScores(response string) (models.Scores, error) {
+	log.Printf("DEBUG - Attempting to parse response (length: %d)", len(response))
+	log.Printf("DEBUG - Response preview: %s", truncate(response, 500))
+
 	// Try direct parsing first (response is pure JSON)
 	var scores models.Scores
 	if err := json.Unmarshal([]byte(response), &scores); err == nil {
+		log.Printf("DEBUG - Direct JSON parse successful: Exp=%.2f, Edu=%.2f, Duties=%.2f, CL=%.2f",
+			scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 		return scores, nil
+	} else {
+		log.Printf("DEBUG - Direct JSON parse failed: %v", err)
 	}
 
 	// Try finding JSON between curly braces (response has extra text)
@@ -193,7 +201,12 @@ func (s *Scorer) parseScores(response string) (models.Scores, error) {
 	jsonStr := response[startIdx : endIdx+1]
 
 	if err := json.Unmarshal([]byte(jsonStr), &scores); err != nil {
+		log.Printf("DEBUG - Extracted JSON parse failed: %v", err)
+		log.Printf("DEBUG - Extracted JSON: %s", jsonStr)
 		return models.Scores{}, fmt.Errorf("failed to parse extracted JSON: %w\nExtracted: %s", err, truncate(jsonStr, 200))
+	} else {
+		log.Printf("DEBUG - Extracted JSON parse successful: Exp=%.2f, Edu=%.2f, Duties=%.2f, CL=%.2f",
+			scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 	}
 
 	return scores, nil

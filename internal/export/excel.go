@@ -54,12 +54,12 @@ func ExportToExcel(results []models.ApplicantResult, jobDesc models.JobDescripti
 		// If direct save fails, try buffer write fallback
 		var buf bytes.Buffer
 		if writeErr := f.Write(&buf); writeErr != nil {
-			return fmt.Errorf("failed to write Excel file to buffer: %w", writeErr)
+			return fmt.Errorf("failed to save Excel file: direct save failed (%v), buffer write also failed: %w", err, writeErr)
 		}
 
 		// Write buffer to file
 		if fileErr := os.WriteFile(outputPath, buf.Bytes(), 0644); fileErr != nil {
-			return fmt.Errorf("failed to save Excel file (direct save error: %v, buffer write error: %w)", err, fileErr)
+			return fmt.Errorf("failed to save Excel file: direct save failed (%v), file write failed: %w", err, fileErr)
 		}
 	}
 

@@ -112,7 +112,7 @@ func TestExportToExcel_CleansPaths(t *testing.T) {
 
 	// Test with path that has multiple separators
 	outputPath := filepath.Join(tmpDir, "reports", "test.xlsx")
-	
+
 	// Create the reports directory
 	reportsDir := filepath.Join(tmpDir, "reports")
 	if err := os.MkdirAll(reportsDir, 0755); err != nil {

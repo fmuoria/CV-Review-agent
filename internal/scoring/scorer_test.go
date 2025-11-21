@@ -292,7 +292,7 @@ func TestBuildScoringPrompt_ContentTruncation(t *testing.T) {
 	scorer := &Scorer{}
 
 	// Create long CV content (> 8000 chars)
-	longCV := strings.Repeat("This is CV content. ", 500) // ~10,000 chars
+	longCV := strings.Repeat("This is CV content. ", 500)           // ~10,000 chars
 	longCL := strings.Repeat("This is cover letter content. ", 150) // ~4,500 chars
 
 	applicant := models.ApplicantDocument{

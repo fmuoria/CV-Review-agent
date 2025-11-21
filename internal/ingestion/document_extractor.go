@@ -80,14 +80,15 @@ func IsBinaryData(content string) bool {
 	}
 
 	// Check for ZIP magic number (DOCX files)
-	if len(content) >= 4 && content[0] == 'P' && content[1] == 'K' {
+	if len(content) >= 2 && content[:2] == "PK" {
 		return true
 	}
 
 	// Check for high proportion of non-printable characters
 	sampleSize := min(BinarySampleSize, len(content))
 	nonPrintable := 0
-	for _, ch := range content[:sampleSize] {
+	for i := 0; i < sampleSize; i++ {
+		ch := content[i]
 		if ch < 32 && ch != '\n' && ch != '\r' && ch != '\t' {
 			nonPrintable++
 		}

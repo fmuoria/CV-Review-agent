@@ -70,6 +70,25 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
    - Create OAuth 2.0 credentials (Desktop app)
    - Download credentials as `credentials.json` in the project root
 
+5. (Optional) For PDF text extraction, install poppler-utils:
+
+   **Ubuntu/Debian:**
+   ```bash
+   sudo apt-get install poppler-utils
+   ```
+
+   **macOS:**
+   ```bash
+   brew install poppler
+   ```
+
+   **Windows (Git Bash/MSYS2):**
+   ```bash
+   pacman -S mingw-w64-x86_64-poppler
+   ```
+
+   Without this, PDF files will be skipped with a warning. Plain text (.txt) files work without any additional tools.
+
 ## Usage
 
 ### Starting the Server

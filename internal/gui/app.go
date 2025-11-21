@@ -17,37 +17,43 @@ import (
 	"github.com/fmuoria/CV-Review-agent/internal/agent"
 	"github.com/fmuoria/CV-Review-agent/internal/config"
 	"github.com/fmuoria/CV-Review-agent/internal/export"
+	"github.com/fmuoria/CV-Review-agent/internal/ingestion"
 	"github.com/fmuoria/CV-Review-agent/internal/models"
+)
+
+const (
+	// gmailCredentialsFilename is the expected filename for Gmail API credentials
+	gmailCredentialsFilename = "credentials.json"
 )
 
 // App represents the main GUI application
 type App struct {
-	fyneApp         fyne.App
-	mainWindow      fyne.Window
-	config          *config.Config
-	agent           *agent.CVReviewAgent
-	ctx             context.Context
-	cancelFunc      context.CancelFunc
-	
+	fyneApp    fyne.App
+	mainWindow fyne.Window
+	config     *config.Config
+	agent      *agent.CVReviewAgent
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+
 	// UI Components
-	gmailStatusLabel    *widget.Label
-	authenticateBtn     *widget.Button
-	subjectEntry        *widget.Entry
-	jobTitleEntry       *widget.Entry
-	requiredExpText     *widget.Entry
-	requiredEduText     *widget.Entry
-	requiredDutiesText  *widget.Entry
-	niceToHaveExpText   *widget.Entry
-	niceToHaveEduText   *widget.Entry
+	gmailStatusLabel     *widget.Label
+	authenticateBtn      *widget.Button
+	subjectEntry         *widget.Entry
+	jobTitleEntry        *widget.Entry
+	requiredExpText      *widget.Entry
+	requiredEduText      *widget.Entry
+	requiredDutiesText   *widget.Entry
+	niceToHaveExpText    *widget.Entry
+	niceToHaveEduText    *widget.Entry
 	niceToHaveDutiesText *widget.Entry
-	jobDescText         *widget.Entry
-	processBtn          *widget.Button
-	cancelBtn           *widget.Button
-	progressBar         *widget.ProgressBar
-	progressLabel       *widget.Label
-	resultsTable        *widget.Table
-	exportBtn           *widget.Button
-	
+	jobDescText          *widget.Entry
+	processBtn           *widget.Button
+	cancelBtn            *widget.Button
+	progressBar          *widget.ProgressBar
+	progressLabel        *widget.Label
+	resultsTable         *widget.Table
+	exportBtn            *widget.Button
+
 	results []models.ApplicantResult
 }
 
@@ -320,30 +326,108 @@ func (a *App) handleAuthenticate() {
 	// Check if credentials file exists
 	credsPath := a.config.GmailCredentialsPath
 	if credsPath == "" {
-		credsPath = "credentials.json"
+		credsPath = gmailCredentialsFilename
 	}
 
 	if _, err := os.Stat(credsPath); os.IsNotExist(err) {
-		dialog.ShowError(fmt.Errorf("credentials.json not found. Please configure Gmail credentials in Settings"), a.mainWindow)
+		dialog.ShowError(fmt.Errorf("%s not found. Please configure Gmail credentials in Settings", gmailCredentialsFilename), a.mainWindow)
 		return
 	}
 
-	// Try to create Gmail handler (this will trigger OAuth flow if needed)
+	// Show loading dialog
+	progressDialog := dialog.NewCustomWithoutButtons("Authenticating",
+		widget.NewLabel("Authenticating with Gmail...\nCheck the console for the OAuth URL if your browser doesn't open."),
+		a.mainWindow)
+	progressDialog.Show()
+
+	// Disable authenticate button
+	a.authenticateBtn.Disable()
+
+	// Run authentication in background
 	go func() {
-		// This will open a browser for OAuth if token.json doesn't exist
-		_, err := a.agent.FileHandler.LoadDocuments() // Just a placeholder to test
+		// Handle credentials path - Gmail handler expects credentials.json in current directory
+		needsCleanup := false
+		if credsPath != gmailCredentialsFilename {
+			// Check if credentials.json already exists in current directory
+			if stat, err := os.Stat(gmailCredentialsFilename); err != nil {
+				if !os.IsNotExist(err) {
+					// An error other than "not exists" occurred
+					log.Printf("Failed to stat %s: %v", gmailCredentialsFilename, err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to check credentials file: %w", err), a.mainWindow)
+					})
+					return
+				}
+				// File doesn't exist, we need to copy it
+				data, err := os.ReadFile(credsPath)
+				if err != nil {
+					log.Printf("Failed to read credentials from %s: %v", credsPath, err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to read credentials file: %w", err), a.mainWindow)
+					})
+					return
+				}
+
+				if err := os.WriteFile(gmailCredentialsFilename, data, 0600); err != nil {
+					log.Printf("Failed to write temporary %s: %v", gmailCredentialsFilename, err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to create temporary credentials file: %w", err), a.mainWindow)
+					})
+					return
+				}
+				needsCleanup = true
+			} else if stat.IsDir() {
+				// credentials.json exists but is a directory
+				log.Printf("%s exists but is a directory", gmailCredentialsFilename)
+				fyne.Do(func() {
+					progressDialog.Hide()
+					a.authenticateBtn.Enable()
+					dialog.ShowError(fmt.Errorf("%s is a directory, not a file", gmailCredentialsFilename), a.mainWindow)
+				})
+				return
+			}
+		}
+
+		// Ensure cleanup happens even if OAuth flow fails
+		defer func() {
+			if needsCleanup {
+				if err := os.Remove(gmailCredentialsFilename); err != nil {
+					log.Printf("Warning: Failed to clean up temporary %s: %v", gmailCredentialsFilename, err)
+				}
+			}
+		}()
+
+		// Try to create Gmail handler (this will trigger OAuth flow if token.json doesn't exist)
+		// The handler creation verifies that authentication works
+		uploadsDir := a.config.UploadsDir
+		if uploadsDir == "" {
+			uploadsDir = "uploads"
+		}
+
+		_, err := ingestion.NewGmailHandlerWithCallback(uploadsDir, nil)
+
+		// All UI updates must be done on the main thread using fyne.Do
 		if err != nil {
-			fyne.CurrentApp().SendNotification(&fyne.Notification{
-				Title:   "Authentication Failed",
-				Content: err.Error(),
+			fyne.Do(func() {
+				progressDialog.Hide()
+				a.authenticateBtn.Enable()
+				dialog.ShowError(fmt.Errorf("authentication failed: %w", err), a.mainWindow)
 			})
 			return
 		}
 
-		a.gmailStatusLabel.SetText("Gmail: Authenticated")
-		fyne.CurrentApp().SendNotification(&fyne.Notification{
-			Title:   "Success",
-			Content: "Gmail authenticated successfully",
+		// Update UI on main thread
+		fyne.Do(func() {
+			progressDialog.Hide()
+			a.authenticateBtn.Enable()
+			a.gmailStatusLabel.SetText("Gmail: Authenticated")
+			dialog.ShowInformation("Success", "Gmail authenticated successfully!\nYou can now process CVs from Gmail.", a.mainWindow)
 		})
 	}()
 }
@@ -396,7 +480,7 @@ func (a *App) handleProcess() {
 	// Process in background
 	go func() {
 		err := a.agent.IngestFromGmailWithContext(a.ctx, a.subjectEntry.Text, string(jobDescJSON))
-		
+
 		// Re-enable buttons on UI thread
 		a.processBtn.Enable()
 		a.cancelBtn.Disable()
@@ -417,7 +501,7 @@ func (a *App) handleProcess() {
 		a.exportBtn.Enable()
 
 		a.progressLabel.SetText(fmt.Sprintf("Complete! Processed %d candidates", len(a.results)))
-		
+
 		fyne.CurrentApp().SendNotification(&fyne.Notification{
 			Title:   "Processing Complete",
 			Content: fmt.Sprintf("Successfully processed %d candidates", len(a.results)),
@@ -505,14 +589,14 @@ func splitByNewline(s string) []string {
 func trimSpace(s string) string {
 	start := 0
 	end := len(s)
-	
+
 	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
 		start++
 	}
-	
+
 	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
 		end--
 	}
-	
+
 	return s[start:end]
 }

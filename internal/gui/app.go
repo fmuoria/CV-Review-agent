@@ -466,27 +466,6 @@ func (a *App) handleExport() {
 
 		dialog.ShowInformation("Success", "Results exported successfully to "+filepath.Base(outputPath), a.mainWindow)
 	}, a.mainWindow)
-
-	// Set default filename
-	dialog.ShowFileSave(func(uc fyne.URIWriteCloser, err error) {
-		if err != nil {
-			dialog.ShowError(err, a.mainWindow)
-			return
-		}
-		if uc == nil {
-			return
-		}
-		defer uc.Close()
-
-		outputPath := uc.URI().Path()
-		jobDesc := a.agent.GetJobDescription()
-		if err := export.ExportToExcel(a.results, jobDesc, outputPath); err != nil {
-			dialog.ShowError(fmt.Errorf("failed to export: %w", err), a.mainWindow)
-			return
-		}
-
-		dialog.ShowInformation("Success", "Results exported successfully", a.mainWindow)
-	}, a.mainWindow)
 }
 
 // splitLines splits text by newlines and filters empty lines

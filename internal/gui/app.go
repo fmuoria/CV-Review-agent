@@ -517,7 +517,9 @@ func (a *App) handleProcess() {
 func (a *App) handleCancel() {
 	if a.cancelFunc != nil {
 		a.cancelFunc()
-		a.progressLabel.SetText("Canceling...")
+		fyne.Do(func() {
+			a.progressLabel.SetText("Canceling...")
+		})
 	}
 }
 

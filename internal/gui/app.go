@@ -345,11 +345,27 @@ func (a *App) handleAuthenticate() {
 		if credsPath != "credentials.json" {
 			// Temporarily copy credentials to current directory for Gmail handler
 			if _, err := os.Stat("credentials.json"); os.IsNotExist(err) {
-				if data, err := os.ReadFile(credsPath); err == nil {
-					if err := os.WriteFile("credentials.json", data, 0600); err == nil {
-						needsCleanup = true
-					}
+				data, err := os.ReadFile(credsPath)
+				if err != nil {
+					log.Printf("Failed to read credentials from %s: %v", credsPath, err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to read credentials file: %w", err), a.mainWindow)
+					})
+					return
 				}
+
+				if err := os.WriteFile("credentials.json", data, 0600); err != nil {
+					log.Printf("Failed to write temporary credentials.json: %v", err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to create temporary credentials file: %w", err), a.mainWindow)
+					})
+					return
+				}
+				needsCleanup = true
 			}
 		}
 
@@ -363,7 +379,9 @@ func (a *App) handleAuthenticate() {
 
 		// Clean up temporary credentials.json if we created it
 		if needsCleanup {
-			os.Remove("credentials.json")
+			if err := os.Remove("credentials.json"); err != nil {
+				log.Printf("Warning: Failed to clean up temporary credentials.json: %v", err)
+			}
 		}
 
 		// All UI updates must be done on the main thread using fyne.Do

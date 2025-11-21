@@ -17,6 +17,7 @@ import (
 	"github.com/fmuoria/CV-Review-agent/internal/agent"
 	"github.com/fmuoria/CV-Review-agent/internal/config"
 	"github.com/fmuoria/CV-Review-agent/internal/export"
+	"github.com/fmuoria/CV-Review-agent/internal/ingestion"
 	"github.com/fmuoria/CV-Review-agent/internal/models"
 )
 
@@ -328,22 +329,59 @@ func (a *App) handleAuthenticate() {
 		return
 	}
 
-	// Try to create Gmail handler (this will trigger OAuth flow if needed)
+	// Show loading dialog
+	progressDialog := dialog.NewCustomWithoutButtons("Authenticating",
+		widget.NewLabel("Authenticating with Gmail...\nCheck the console for the OAuth URL if your browser doesn't open."),
+		a.mainWindow)
+	progressDialog.Show()
+
+	// Disable authenticate button
+	a.authenticateBtn.Disable()
+
+	// Run authentication in background
 	go func() {
-		// This will open a browser for OAuth if token.json doesn't exist
-		_, err := a.agent.FileHandler.LoadDocuments() // Just a placeholder to test
+		// Handle credentials path - Gmail handler expects credentials.json in current directory
+		needsCleanup := false
+		if credsPath != "credentials.json" {
+			// Temporarily copy credentials to current directory for Gmail handler
+			if _, err := os.Stat("credentials.json"); os.IsNotExist(err) {
+				if data, err := os.ReadFile(credsPath); err == nil {
+					if err := os.WriteFile("credentials.json", data, 0600); err == nil {
+						needsCleanup = true
+					}
+				}
+			}
+		}
+
+		// Try to create Gmail handler (this will trigger OAuth flow if token.json doesn't exist)
+		uploadsDir := a.config.UploadsDir
+		if uploadsDir == "" {
+			uploadsDir = "uploads"
+		}
+
+		_, err := ingestion.NewGmailHandlerWithCallback(uploadsDir, nil)
+
+		// Clean up temporary credentials.json if we created it
+		if needsCleanup {
+			os.Remove("credentials.json")
+		}
+
+		// All UI updates must be done on the main thread using fyne.Do
 		if err != nil {
-			fyne.CurrentApp().SendNotification(&fyne.Notification{
-				Title:   "Authentication Failed",
-				Content: err.Error(),
+			fyne.Do(func() {
+				progressDialog.Hide()
+				a.authenticateBtn.Enable()
+				dialog.ShowError(fmt.Errorf("authentication failed: %w", err), a.mainWindow)
 			})
 			return
 		}
 
-		a.gmailStatusLabel.SetText("Gmail: Authenticated")
-		fyne.CurrentApp().SendNotification(&fyne.Notification{
-			Title:   "Success",
-			Content: "Gmail authenticated successfully",
+		// Update UI on main thread
+		fyne.Do(func() {
+			progressDialog.Hide()
+			a.authenticateBtn.Enable()
+			a.gmailStatusLabel.SetText("Gmail: Authenticated")
+			dialog.ShowInformation("Success", "Gmail authenticated successfully!\nYou can now process CVs from Gmail.", a.mainWindow)
 		})
 	}()
 }

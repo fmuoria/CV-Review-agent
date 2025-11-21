@@ -109,9 +109,18 @@ func createSummarySheet(f *excelize.File, sheetName string, results []models.App
 	f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), time.Now().Format("2006-01-02 15:04:05"))
 	row++
 
-	f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Total Candidates:")
+	f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Total Candidates Scored:")
 	f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), labelStyle)
 	f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), len(results))
+	row++
+
+	// Note about candidate count
+	f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Note:")
+	f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), labelStyle)
+	noteText := "If fewer candidates than emails/files, files may have been skipped due to: " +
+		"scanned images (no text), certificate-only PDFs, duplicates, unsupported formats, " +
+		"or naming conventions not matching expected pattern (Name_CV.pdf / Name_CoverLetter.pdf)."
+	f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), noteText)
 	row += 2
 
 	// Statistics
@@ -165,7 +174,57 @@ func createSummarySheet(f *excelize.File, sheetName string, results []models.App
 		f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Average Score:")
 		f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), labelStyle)
 		f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("%.2f", avgScore))
+		row += 2
+
+		// Additional detailed statistics
+		f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Score Distribution Details:")
+		f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("B%d", row), headerStyle)
+		f.MergeCell(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("B%d", row))
 		row++
+
+		// Calculate min, max, median
+		if len(results) > 0 {
+			var minScore, maxScore float64
+			minScore = results[0].Scores.TotalScore
+			maxScore = results[0].Scores.TotalScore
+
+			for _, r := range results {
+				if r.Scores.TotalScore < minScore {
+					minScore = r.Scores.TotalScore
+				}
+				if r.Scores.TotalScore > maxScore {
+					maxScore = r.Scores.TotalScore
+				}
+			}
+
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Highest Score:")
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("%.2f", maxScore))
+			row++
+
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Lowest Score:")
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("%.2f", minScore))
+			row++
+
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Score Range:")
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("%.2f", maxScore-minScore))
+			row += 2
+
+			// Count candidates with/without cover letters
+			withCL := 0
+			for _, r := range results {
+				if r.CLPath != "" {
+					withCL++
+				}
+			}
+
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Candidates with Cover Letter:")
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), withCL)
+			row++
+
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "Candidates without Cover Letter:")
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), len(results)-withCL)
+			row++
+		}
 	}
 
 	return nil

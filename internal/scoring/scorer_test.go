@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"strings"
 	"testing"
 	"unicode/utf8"
 )
@@ -89,12 +90,9 @@ func TestSanitizeUTF8_InvalidString(t *testing.T) {
 				t.Errorf("sanitizeUTF8() returned invalid UTF-8 string: %q", result)
 			}
 
-			// Result should contain the expected text
-			if tt.contains != "" && len(result) > 0 {
-				// Just verify result is not empty and is valid UTF-8
-				if len(result) == 0 {
-					t.Errorf("sanitizeUTF8() returned empty string")
-				}
+			// Result should be non-empty
+			if len(result) == 0 {
+				t.Errorf("sanitizeUTF8() returned empty string")
 			}
 		})
 	}
@@ -140,8 +138,13 @@ func TestSanitizeUTF8_ReplacementCharacter(t *testing.T) {
 		t.Errorf("sanitizeUTF8() returned invalid UTF-8 string")
 	}
 
-	// Result should contain replacement character or be valid
-	if !utf8.ValidString(result) {
-		t.Errorf("Result is not valid UTF-8")
+	// Result should contain the text before and after
+	if !strings.Contains(result, "Before") || !strings.Contains(result, "After") {
+		t.Errorf("sanitizeUTF8() did not preserve valid text: got %q", result)
+	}
+
+	// Result should contain the replacement character
+	if !strings.Contains(result, "�") {
+		t.Errorf("sanitizeUTF8() did not include replacement character")
 	}
 }

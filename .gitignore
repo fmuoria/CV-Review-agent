@@ -42,3 +42,4 @@ cmd/gui/cv-review-agent-gui.exe
 installer/windows/output/
 fyne-cross/
 *.syso
+credentials/

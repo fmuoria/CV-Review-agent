@@ -157,6 +157,48 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 		sb.WriteString("\n\n")
 	}
 
+	sb.WriteString("## EXPERIENCE SCORING RULES (CRITICAL)\n\n")
+	sb.WriteString("**STEP 1: EXTRACT KEY EXPERIENCE REQUIREMENTS**\n")
+	sb.WriteString("From the job description above, identify the CORE experience domains/keywords required.\n")
+	sb.WriteString("Examples:\n")
+	sb.WriteString("- \"5+ years in VSLA/lending\" → Keywords: [VSLA, lending, credit, loans, microfinance, SACCO]\n")
+	sb.WriteString("- \"3+ years Data Science\" → Keywords: [data science, analytics, machine learning, statistics, Python, R]\n")
+	sb.WriteString("- \"Software Engineer\" → Keywords: [software, programming, development, coding, engineer]\n\n")
+
+	sb.WriteString("**STEP 2: CHECK CV FOR RELEVANCE**\n")
+	sb.WriteString("Does the applicant's CV contain evidence of experience in these SPECIFIC domains?\n")
+	sb.WriteString("- Look for job titles, duties, and responsibilities that match the keywords\n")
+	sb.WriteString("- Generic management or unrelated fields do NOT count\n\n")
+
+	sb.WriteString("**STEP 3: SCORE EXPERIENCE (0-50)**\n\n")
+	sb.WriteString("**RELEVANCE CHECK (MANDATORY FIRST):**\n")
+	sb.WriteString("- NO relevant keywords in CV → MAX 10 points (even if 10+ years in other fields)\n")
+	sb.WriteString("- Keywords mentioned but in unrelated context → MAX 15 points\n")
+	sb.WriteString("- Some relevant experience but different domain → 15-25 points\n")
+	sb.WriteString("- Direct relevant experience in required domain → 25-50 points\n\n")
+
+	sb.WriteString("**YEARS CHECK (ONLY IF RELEVANT EXPERIENCE EXISTS):**\n")
+	sb.WriteString("If experience IS relevant to job requirements:\n")
+	sb.WriteString("- 0-1 years relevant → 15-25 points\n")
+	sb.WriteString("- 1-2 years relevant → 25-32 points\n")
+	sb.WriteString("- 2-3 years relevant → 32-38 points\n")
+	sb.WriteString("- 3-5 years relevant → 38-45 points\n")
+	sb.WriteString("- 5+ years relevant → 45-50 points\n\n")
+
+	sb.WriteString("**EXAMPLES FOR THIS JOB:**\n")
+	if len(jobDesc.RequiredExperience) > 0 {
+		// Take first 2 required experience items as examples
+		for i := 0; i < min(2, len(jobDesc.RequiredExperience)); i++ {
+			sb.WriteString(fmt.Sprintf("Required: \"%s\"\n", jobDesc.RequiredExperience[i]))
+		}
+		sb.WriteString("- CV with completely unrelated field (e.g., retail, agriculture when job needs tech) → 5-10/50\n")
+		sb.WriteString("- CV with tangential experience (adjacent field) → 15-25/50\n")
+		sb.WriteString("- CV with 2-4 years in required field → 30-40/50\n")
+		sb.WriteString("- CV with 5+ years in required field → 45-50/50\n\n")
+	}
+
+	sb.WriteString("**CRITICAL: Many years in the WRONG field is worth less than fewer years in the RIGHT field.**\n\n")
+
 	sb.WriteString("## EVALUATION\n")
 	sb.WriteString("Score the applicant. Missing REQUIRED items = major deductions. Missing NICE TO HAVE = minor impact.\n\n")
 

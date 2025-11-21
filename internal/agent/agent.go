@@ -291,9 +291,30 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 
 	a.reportProgress(95, 100, "Ranking candidates...")
 
-	// Sort by total score (descending)
+	// Sort by total score (descending), with tie-breaking by component scores
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].Scores.TotalScore > results[j].Scores.TotalScore
+		// Primary: Total score
+		if results[i].Scores.TotalScore != results[j].Scores.TotalScore {
+			return results[i].Scores.TotalScore > results[j].Scores.TotalScore
+		}
+
+		// Tie-breaker 1: Experience score (most important for ranking)
+		if results[i].Scores.ExperienceScore != results[j].Scores.ExperienceScore {
+			return results[i].Scores.ExperienceScore > results[j].Scores.ExperienceScore
+		}
+
+		// Tie-breaker 2: Duties score (can they do the job?)
+		if results[i].Scores.DutiesScore != results[j].Scores.DutiesScore {
+			return results[i].Scores.DutiesScore > results[j].Scores.DutiesScore
+		}
+
+		// Tie-breaker 3: Education score
+		if results[i].Scores.EducationScore != results[j].Scores.EducationScore {
+			return results[i].Scores.EducationScore > results[j].Scores.EducationScore
+		}
+
+		// Tie-breaker 4: Cover letter score
+		return results[i].Scores.CoverLetterScore > results[j].Scores.CoverLetterScore
 	})
 
 	// Assign ranks

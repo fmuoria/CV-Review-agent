@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/fmuoria/CV-Review-agent/internal/llm"
 	"github.com/fmuoria/CV-Review-agent/internal/models"
@@ -20,6 +22,19 @@ func NewScorer(llmClient *llm.VertexAIClient) *Scorer {
 	return &Scorer{
 		llmClient: llmClient,
 	}
+}
+
+// sanitizeUTF8 removes invalid UTF-8 sequences and replaces them with the Unicode replacement character
+// This prevents gRPC marshaling errors when sending text to Vertex AI
+func sanitizeUTF8(s string) string {
+	// If the string is already valid UTF-8, return it as-is
+	if utf8.ValidString(s) {
+		return s
+	}
+
+	// Use strings.ToValidUTF8 to replace invalid UTF-8 sequences with the replacement character (�)
+	// This is the most efficient and standard way to clean invalid UTF-8
+	return strings.ToValidUTF8(s, "�")
 }
 
 // ScoreApplicant evaluates an applicant against a job description
@@ -99,12 +114,26 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString(fmt.Sprintf("Name: %s\n\n", applicant.Name))
 
 	sb.WriteString("### CV CONTENT\n")
-	sb.WriteString(applicant.CVContent)
+	// Sanitize CV content to prevent UTF-8 encoding errors
+	cvContent := applicant.CVContent
+	if !utf8.ValidString(cvContent) {
+		log.Printf("Sanitizing invalid UTF-8 in CV for applicant: %s (length: %d bytes)", applicant.Name, len(cvContent))
+		cvContent = sanitizeUTF8(cvContent)
+		log.Printf("After sanitization: %d bytes", len(cvContent))
+	}
+	sb.WriteString(cvContent)
 	sb.WriteString("\n\n")
 
 	if applicant.CLContent != "" {
 		sb.WriteString("### COVER LETTER CONTENT\n")
-		sb.WriteString(applicant.CLContent)
+		// Sanitize cover letter content to prevent UTF-8 encoding errors
+		clContent := applicant.CLContent
+		if !utf8.ValidString(clContent) {
+			log.Printf("Sanitizing invalid UTF-8 in cover letter for applicant: %s (length: %d bytes)", applicant.Name, len(clContent))
+			clContent = sanitizeUTF8(clContent)
+			log.Printf("After sanitization: %d bytes", len(clContent))
+		}
+		sb.WriteString(clContent)
 		sb.WriteString("\n\n")
 	}
 

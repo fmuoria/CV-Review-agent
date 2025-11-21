@@ -348,8 +348,19 @@ func (a *App) handleAuthenticate() {
 		// Handle credentials path - Gmail handler expects credentials.json in current directory
 		needsCleanup := false
 		if credsPath != gmailCredentialsFilename {
-			// Temporarily copy credentials to current directory for Gmail handler
-			if _, err := os.Stat(gmailCredentialsFilename); os.IsNotExist(err) {
+			// Check if credentials.json already exists in current directory
+			if stat, err := os.Stat(gmailCredentialsFilename); err != nil {
+				if !os.IsNotExist(err) {
+					// An error other than "not exists" occurred
+					log.Printf("Failed to stat %s: %v", gmailCredentialsFilename, err)
+					fyne.Do(func() {
+						progressDialog.Hide()
+						a.authenticateBtn.Enable()
+						dialog.ShowError(fmt.Errorf("failed to check credentials file: %w", err), a.mainWindow)
+					})
+					return
+				}
+				// File doesn't exist, we need to copy it
 				data, err := os.ReadFile(credsPath)
 				if err != nil {
 					log.Printf("Failed to read credentials from %s: %v", credsPath, err)
@@ -371,23 +382,35 @@ func (a *App) handleAuthenticate() {
 					return
 				}
 				needsCleanup = true
+			} else if stat.IsDir() {
+				// credentials.json exists but is a directory
+				log.Printf("%s exists but is a directory", gmailCredentialsFilename)
+				fyne.Do(func() {
+					progressDialog.Hide()
+					a.authenticateBtn.Enable()
+					dialog.ShowError(fmt.Errorf("%s is a directory, not a file", gmailCredentialsFilename), a.mainWindow)
+				})
+				return
 			}
 		}
 
+		// Ensure cleanup happens even if OAuth flow fails
+		defer func() {
+			if needsCleanup {
+				if err := os.Remove(gmailCredentialsFilename); err != nil {
+					log.Printf("Warning: Failed to clean up temporary %s: %v", gmailCredentialsFilename, err)
+				}
+			}
+		}()
+
 		// Try to create Gmail handler (this will trigger OAuth flow if token.json doesn't exist)
+		// The handler creation verifies that authentication works
 		uploadsDir := a.config.UploadsDir
 		if uploadsDir == "" {
 			uploadsDir = "uploads"
 		}
 
 		_, err := ingestion.NewGmailHandlerWithCallback(uploadsDir, nil)
-
-		// Clean up temporary credentials file if we created it
-		if needsCleanup {
-			if err := os.Remove(gmailCredentialsFilename); err != nil {
-				log.Printf("Warning: Failed to clean up temporary %s: %v", gmailCredentialsFilename, err)
-			}
-		}
 
 		// All UI updates must be done on the main thread using fyne.Do
 		if err != nil {

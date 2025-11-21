@@ -22,32 +22,32 @@ import (
 
 // App represents the main GUI application
 type App struct {
-	fyneApp         fyne.App
-	mainWindow      fyne.Window
-	config          *config.Config
-	agent           *agent.CVReviewAgent
-	ctx             context.Context
-	cancelFunc      context.CancelFunc
-	
+	fyneApp    fyne.App
+	mainWindow fyne.Window
+	config     *config.Config
+	agent      *agent.CVReviewAgent
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+
 	// UI Components
-	gmailStatusLabel    *widget.Label
-	authenticateBtn     *widget.Button
-	subjectEntry        *widget.Entry
-	jobTitleEntry       *widget.Entry
-	requiredExpText     *widget.Entry
-	requiredEduText     *widget.Entry
-	requiredDutiesText  *widget.Entry
-	niceToHaveExpText   *widget.Entry
-	niceToHaveEduText   *widget.Entry
+	gmailStatusLabel     *widget.Label
+	authenticateBtn      *widget.Button
+	subjectEntry         *widget.Entry
+	jobTitleEntry        *widget.Entry
+	requiredExpText      *widget.Entry
+	requiredEduText      *widget.Entry
+	requiredDutiesText   *widget.Entry
+	niceToHaveExpText    *widget.Entry
+	niceToHaveEduText    *widget.Entry
 	niceToHaveDutiesText *widget.Entry
-	jobDescText         *widget.Entry
-	processBtn          *widget.Button
-	cancelBtn           *widget.Button
-	progressBar         *widget.ProgressBar
-	progressLabel       *widget.Label
-	resultsTable        *widget.Table
-	exportBtn           *widget.Button
-	
+	jobDescText          *widget.Entry
+	processBtn           *widget.Button
+	cancelBtn            *widget.Button
+	progressBar          *widget.ProgressBar
+	progressLabel        *widget.Label
+	resultsTable         *widget.Table
+	exportBtn            *widget.Button
+
 	results []models.ApplicantResult
 }
 
@@ -396,7 +396,7 @@ func (a *App) handleProcess() {
 	// Process in background
 	go func() {
 		err := a.agent.IngestFromGmailWithContext(a.ctx, a.subjectEntry.Text, string(jobDescJSON))
-		
+
 		// Re-enable buttons on UI thread
 		a.processBtn.Enable()
 		a.cancelBtn.Disable()
@@ -417,7 +417,7 @@ func (a *App) handleProcess() {
 		a.exportBtn.Enable()
 
 		a.progressLabel.SetText(fmt.Sprintf("Complete! Processed %d candidates", len(a.results)))
-		
+
 		fyne.CurrentApp().SendNotification(&fyne.Notification{
 			Title:   "Processing Complete",
 			Content: fmt.Sprintf("Successfully processed %d candidates", len(a.results)),
@@ -505,14 +505,14 @@ func splitByNewline(s string) []string {
 func trimSpace(s string) string {
 	start := 0
 	end := len(s)
-	
+
 	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
 		start++
 	}
-	
+
 	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
 		end--
 	}
-	
+
 	return s[start:end]
 }

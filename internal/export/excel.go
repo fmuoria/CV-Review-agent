@@ -53,8 +53,8 @@ func createSummarySheet(f *excelize.File, sheetName string, results []models.App
 
 	// Create header style
 	headerStyle, err := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Size: 14, Color: "FFFFFF"},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"4472C4"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Size: 14, Color: "FFFFFF"},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"4472C4"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "left", Vertical: "center"},
 	})
 	if err != nil {

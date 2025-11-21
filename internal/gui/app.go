@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -531,8 +530,8 @@ func (a *App) handleExport() {
 	}
 
 	// Create default filename with timestamp
-	timestamp := time.Now().Format("2006-01-02_150405")
-	defaultName := fmt.Sprintf("CV_Review_Results_%s.xlsx", timestamp)
+	//timestamp := time.Now().Format("2006-01-02_150405")
+	//defaultName := fmt.Sprintf("CV_Review_Results_%s.xlsx", timestamp)
 
 	// Show save dialog
 	dialog.ShowFileSave(func(uc fyne.URIWriteCloser, err error) {

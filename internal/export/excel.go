@@ -181,6 +181,8 @@ func createRankedCandidatesSheet(f *excelize.File, sheetName string, results []m
 	f.SetColWidth(sheetName, "E", "E", 15)
 	f.SetColWidth(sheetName, "F", "F", 15)
 	f.SetColWidth(sheetName, "G", "G", 15)
+	f.SetColWidth(sheetName, "H", "H", 12)
+	f.SetColWidth(sheetName, "I", "I", 12)
 
 	// Create header style
 	headerStyle, err := f.NewStyle(&excelize.Style{
@@ -240,7 +242,7 @@ func createRankedCandidatesSheet(f *excelize.File, sheetName string, results []m
 	})
 
 	// Set headers
-	headers := []string{"Rank", "Candidate", "Total Score", "Experience", "Education", "Duties", "Cover Letter"}
+	headers := []string{"Rank", "Candidate", "Total Score", "Experience", "Education", "Duties", "Cover Letter", "CV Link", "CL Link"}
 	for col, header := range headers {
 		cell := fmt.Sprintf("%s1", string(rune('A'+col)))
 		f.SetCellValue(sheetName, cell, header)
@@ -272,11 +274,145 @@ func createRankedCandidatesSheet(f *excelize.File, sheetName string, results []m
 		}
 
 		f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("G%d", row), style)
+
+		// Add CV Link (Column H)
+		if result.CVPath != "" {
+			cvCell := fmt.Sprintf("H%d", row)
+			// Convert to absolute path if needed
+			absPath, err := filepath.Abs(result.CVPath)
+			if err != nil {
+				absPath = result.CVPath
+			}
+			f.SetCellValue(sheetName, cvCell, "Open CV")
+			// Use file:// protocol with forward slashes
+			fileURL := "file:///" + strings.ReplaceAll(absPath, "\\", "/")
+			f.SetCellHyperLink(sheetName, cvCell, fileURL, "External")
+			// Apply link style with same background color
+			if score >= 90 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"C6EFCE"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, cvCell, cvCell, linkStyleWithBg)
+			} else if score >= 70 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FFEB9C"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, cvCell, cvCell, linkStyleWithBg)
+			} else if score >= 50 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FFC7CE"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, cvCell, cvCell, linkStyleWithBg)
+			} else {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FF9999"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, cvCell, cvCell, linkStyleWithBg)
+			}
+		} else {
+			// Apply the same background style even if no link
+			f.SetCellValue(sheetName, fmt.Sprintf("H%d", row), "")
+			f.SetCellStyle(sheetName, fmt.Sprintf("H%d", row), fmt.Sprintf("H%d", row), style)
+		}
+
+		// Add CL Link (Column I)
+		if result.CLPath != "" {
+			clCell := fmt.Sprintf("I%d", row)
+			absPath, err := filepath.Abs(result.CLPath)
+			if err != nil {
+				absPath = result.CLPath
+			}
+			f.SetCellValue(sheetName, clCell, "Open CL")
+			fileURL := "file:///" + strings.ReplaceAll(absPath, "\\", "/")
+			f.SetCellHyperLink(sheetName, clCell, fileURL, "External")
+			// Apply link style with same background color
+			if score >= 90 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"C6EFCE"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, clCell, clCell, linkStyleWithBg)
+			} else if score >= 70 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FFEB9C"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, clCell, clCell, linkStyleWithBg)
+			} else if score >= 50 {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FFC7CE"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, clCell, clCell, linkStyleWithBg)
+			} else {
+				linkStyleWithBg, _ := f.NewStyle(&excelize.Style{
+					Font: &excelize.Font{Color: "0563C1", Underline: "single"},
+					Fill: excelize.Fill{Type: "pattern", Color: []string{"FF9999"}, Pattern: 1},
+					Border: []excelize.Border{
+						{Type: "left", Color: "000000", Style: 1},
+						{Type: "right", Color: "000000", Style: 1},
+						{Type: "top", Color: "000000", Style: 1},
+						{Type: "bottom", Color: "000000", Style: 1},
+					},
+				})
+				f.SetCellStyle(sheetName, clCell, clCell, linkStyleWithBg)
+			}
+		} else {
+			// Apply the same background style even if no link
+			f.SetCellValue(sheetName, fmt.Sprintf("I%d", row), "")
+			f.SetCellStyle(sheetName, fmt.Sprintf("I%d", row), fmt.Sprintf("I%d", row), style)
+		}
 	}
 
 	// Enable auto-filter
 	if len(results) > 0 {
-		f.AutoFilter(sheetName, fmt.Sprintf("A1:G%d", len(results)+1), []excelize.AutoFilterOptions{})
+		f.AutoFilter(sheetName, fmt.Sprintf("A1:I%d", len(results)+1), []excelize.AutoFilterOptions{})
 	}
 
 	// Freeze top row

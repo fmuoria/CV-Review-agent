@@ -220,10 +220,12 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 					scores.DutiesReasoning == "" && scores.CoverLetterReasoning == "" {
 					// Empty response detected
 					if attempt < maxRetries-1 {
-						log.Printf("Empty response received for %s, retrying (attempt %d/%d)",
-							doc.Name, attempt+1, maxRetries)
-						a.reportProgress(progress, 100, fmt.Sprintf("Empty response - retrying %s (attempt %d/%d)", doc.Name, attempt+1, maxRetries))
-						time.Sleep(retryBackoff)
+						// Exponential backoff: 10s, 20s, 40s
+						backoffDuration := retryBackoff * time.Duration(1<<attempt)
+						log.Printf("Empty response received for %s, retrying in %v (attempt %d/%d)",
+							doc.Name, backoffDuration, attempt+1, maxRetries)
+						a.reportProgress(progress, 100, fmt.Sprintf("Empty response - retrying %s in %v", doc.Name, backoffDuration))
+						time.Sleep(backoffDuration)
 						continue
 					} else {
 						log.Printf("Empty response for %s after %d attempts, skipping", doc.Name, maxRetries)
@@ -238,19 +240,34 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 				break
 			}
 
+			// Check for empty response error
+			if strings.Contains(err.Error(), "length: 0") || strings.Contains(err.Error(), "no JSON found in response:") {
+				if attempt < maxRetries-1 {
+					// Exponential backoff: 10s, 20s, 40s
+					backoffDuration := retryBackoff * time.Duration(1<<attempt)
+					log.Printf("Empty response for %s, retrying in %v (attempt %d/%d)",
+						doc.Name, backoffDuration, attempt+1, maxRetries)
+					a.reportProgress(progress, 100, fmt.Sprintf("Empty response - retrying %s in %v", doc.Name, backoffDuration))
+					time.Sleep(backoffDuration)
+					continue
+				}
+			}
+
 			// Check if it's a rate limit error
 			if isRateLimitError(err) {
 				if attempt < maxRetries-1 {
+					// Exponential backoff: 10s, 20s, 40s
+					backoffDuration := retryBackoff * time.Duration(1<<attempt)
 					log.Printf("Rate limit hit for %s, retrying in %v (attempt %d/%d)",
-						doc.Name, retryBackoff, attempt+1, maxRetries)
-					a.reportProgress(progress, 100, fmt.Sprintf("Rate limit - retrying %s (attempt %d/%d)", doc.Name, attempt+1, maxRetries))
-					time.Sleep(retryBackoff)
+						doc.Name, backoffDuration, attempt+1, maxRetries)
+					a.reportProgress(progress, 100, fmt.Sprintf("Rate limit - retrying %s in %v", doc.Name, backoffDuration))
+					time.Sleep(backoffDuration)
 					continue
 				}
 			}
 
 			// Other errors or max retries reached - log and skip
-			log.Printf("Failed to score applicant %s: %v", doc.Name, err)
+			log.Printf("Failed to score applicant %s after %d attempts: %v", doc.Name, attempt+1, err)
 			break
 		}
 
@@ -258,6 +275,8 @@ func (a *CVReviewAgent) processApplicants(ctx context.Context, documents []model
 			result := models.ApplicantResult{
 				Name:   doc.Name,
 				Scores: scores,
+				CVPath: doc.CVPath,
+				CLPath: doc.CLPath,
 			}
 			results = append(results, result)
 		}

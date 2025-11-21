@@ -185,8 +185,12 @@ func (s *Scorer) parseScores(response string) (models.Scores, error) {
 	if strings.Contains(response, "```json") {
 		// Remove ```json prefix and ``` suffix
 		cleanedResponse = strings.TrimSpace(response)
-		cleanedResponse = strings.TrimPrefix(cleanedResponse, "```json")
-		cleanedResponse = strings.TrimPrefix(cleanedResponse, "```")
+		// Try to remove ```json first, if not present try just ```
+		if strings.HasPrefix(cleanedResponse, "```json") {
+			cleanedResponse = strings.TrimPrefix(cleanedResponse, "```json")
+		} else {
+			cleanedResponse = strings.TrimPrefix(cleanedResponse, "```")
+		}
 		cleanedResponse = strings.TrimSuffix(cleanedResponse, "```")
 		cleanedResponse = strings.TrimSpace(cleanedResponse)
 		log.Printf("DEBUG - Stripped markdown code blocks")
@@ -216,10 +220,10 @@ func (s *Scorer) parseScores(response string) (models.Scores, error) {
 		log.Printf("DEBUG - Extracted JSON parse failed: %v", err)
 		log.Printf("DEBUG - Extracted JSON: %s", jsonStr)
 		return models.Scores{}, fmt.Errorf("failed to parse extracted JSON: %w\nExtracted: %s", err, truncate(jsonStr, 200))
+	} else {
+		log.Printf("DEBUG - Extracted JSON parse successful: Exp=%.2f, Edu=%.2f, Duties=%.2f, CL=%.2f",
+			scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 	}
-
-	log.Printf("DEBUG - Extracted JSON parse successful: Exp=%.2f, Edu=%.2f, Duties=%.2f, CL=%.2f",
-		scores.ExperienceScore, scores.EducationScore, scores.DutiesScore, scores.CoverLetterScore)
 
 	return scores, nil
 }

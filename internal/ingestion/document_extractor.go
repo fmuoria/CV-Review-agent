@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+const (
+	// MinExtractedTextLength is the minimum text length required for successful extraction
+	MinExtractedTextLength = 50
+	// BinarySampleSize is the number of bytes to sample for binary detection
+	BinarySampleSize = 1000
+	// BinaryThreshold is the proportion of non-printable characters that indicates binary data
+	BinaryThreshold = 0.3
+)
+
 // ExtractText extracts text from PDF, DOCX, DOC, or TXT files
 func ExtractText(filePath string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
@@ -34,7 +43,7 @@ func extractPDF(filePath string) (string, error) {
 	}
 
 	text := string(output)
-	if len(text) < 50 {
+	if len(text) < MinExtractedTextLength {
 		return "", fmt.Errorf("extracted text is too short (likely failed extraction) from: %s", filePath)
 	}
 
@@ -76,14 +85,15 @@ func IsBinaryData(content string) bool {
 	}
 
 	// Check for high proportion of non-printable characters
+	sampleSize := min(BinarySampleSize, len(content))
 	nonPrintable := 0
-	for _, ch := range content[:min(1000, len(content))] {
+	for _, ch := range content[:sampleSize] {
 		if ch < 32 && ch != '\n' && ch != '\r' && ch != '\t' {
 			nonPrintable++
 		}
 	}
 
-	return float64(nonPrintable)/float64(min(1000, len(content))) > 0.3
+	return float64(nonPrintable)/float64(sampleSize) > BinaryThreshold
 }
 
 func min(a, b int) int {

@@ -291,9 +291,9 @@ func TestCondenseRequirements(t *testing.T) {
 func TestBuildScoringPrompt_ContentTruncation(t *testing.T) {
 	scorer := &Scorer{}
 
-	// Create long CV content (> 8000 chars)
-	longCV := strings.Repeat("This is CV content. ", 500)           // ~10,000 chars
-	longCL := strings.Repeat("This is cover letter content. ", 150) // ~4,500 chars
+	// Create long CV content (> 15000 chars) and long CL (> 5000 chars)
+	longCV := strings.Repeat("This is CV content. ", 800)           // ~16,000 chars
+	longCL := strings.Repeat("This is cover letter content. ", 200) // ~6,000 chars
 
 	applicant := models.ApplicantDocument{
 		Name:      "John Doe",
@@ -320,7 +320,8 @@ func TestBuildScoringPrompt_ContentTruncation(t *testing.T) {
 	}
 
 	// Ensure prompt is reasonably sized (should be much less than original content)
-	if len(prompt) > 15000 {
+	// Note: With comprehensive scoring instructions added, prompt is now longer (~22-25k chars)
+	if len(prompt) > 30000 {
 		t.Errorf("Prompt still too long: %d bytes", len(prompt))
 	}
 }
@@ -448,5 +449,126 @@ Hope this helps!`,
 				}
 			}
 		})
+	}
+}
+
+// TestBuildScoringPrompt_ContainsCriticalInstructions tests that the prompt includes comprehensive scoring instructions
+func TestBuildScoringPrompt_ContainsCriticalInstructions(t *testing.T) {
+	scorer := &Scorer{}
+
+	applicant := models.ApplicantDocument{
+		Name:      "Test Applicant",
+		CVContent: "Sample CV content",
+		CLContent: "Sample cover letter",
+	}
+
+	jobDesc := models.JobDescription{
+		Title:              "Loan Officer",
+		Description:        "A lending position",
+		RequiredExperience: []string{"5+ years in lending", "Microfinance experience"},
+	}
+
+	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
+
+	// Check for critical sections
+	criticalSections := []string{
+		"CRITICAL SCORING INSTRUCTIONS",
+		"CURRENT DATE FOR REFERENCE: November 22, 2025",
+		"### 1. DATE EXTRACTION RULES",
+		"Duration Calculation:",
+		"Formula: Duration (months) = (End Year - Start Year) × 12 + (End Month - Start Month)",
+		"### 2. CV DOCUMENT SCANNING RULES",
+		"### 3. JOB TITLE RELEVANCE CHECKING",
+		"### 4. EXPERIENCE SCORING (0-50 points)",
+		"Duration Tiers (for RELEVANT experience only):",
+		"0-6 months: Entry-level → 18-24/50",
+		"60+ months: Expert → 45-50/50",
+		"### 5. ACCURACY CHECKS",
+		"Example A:",
+		"08/2025-Present",
+		"3 months",
+		"Example B:",
+		"Supply Chain Manager",
+		"NOT RELEVANT",
+		"Example C:",
+		"Microfinance Officer",
+		"7 years",
+	}
+
+	for _, section := range criticalSections {
+		if !strings.Contains(prompt, section) {
+			t.Errorf("Prompt missing critical section: %q", section)
+		}
+	}
+
+	// Verify prompt is reasonable length (should be > 5000 chars with all instructions)
+	if len(prompt) < 5000 {
+		t.Errorf("Prompt unexpectedly short: %d chars (expected >5000)", len(prompt))
+	}
+}
+
+// TestBuildScoringPrompt_DateCalculationExamples tests that date calculation examples are present
+func TestBuildScoringPrompt_DateCalculationExamples(t *testing.T) {
+	scorer := &Scorer{}
+
+	applicant := models.ApplicantDocument{
+		Name:      "Test Applicant",
+		CVContent: "Sample CV",
+	}
+
+	jobDesc := models.JobDescription{
+		Title:              "Credit Officer",
+		Description:        "Credit position",
+		RequiredExperience: []string{"Credit analysis experience"},
+	}
+
+	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
+
+	// Check for specific date calculation examples
+	dateExamples := []string{
+		"02/2021 to 06/2025",
+		"(2025-2021)×12 + (6-2) = 48+4 = 52 months",
+		"08/2025 to Present",
+		"(2025-2025)×12 + (11-8) = 0+3 = 3 months",
+		"2018 to Present",
+		"(2025-2018)×12 + (11-1) = 84+10 = 94 months",
+	}
+
+	for _, example := range dateExamples {
+		if !strings.Contains(prompt, example) {
+			t.Errorf("Prompt missing date calculation example: %q", example)
+		}
+	}
+}
+
+// TestBuildScoringPrompt_ContextAwareKeywords tests that context-aware keyword validation is present
+func TestBuildScoringPrompt_ContextAwareKeywords(t *testing.T) {
+	scorer := &Scorer{}
+
+	applicant := models.ApplicantDocument{
+		Name:      "Test Applicant",
+		CVContent: "Sample CV",
+	}
+
+	jobDesc := models.JobDescription{
+		Title:              "Lending Officer",
+		Description:        "Lending position",
+		RequiredExperience: []string{"Lending experience"},
+	}
+
+	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
+
+	// Check for context-aware keyword validation examples
+	contextExamples := []string{
+		"Critical: Keyword in wrong context ≠ Experience",
+		"❌ \"Negotiated credit terms with customers\" (sales) ≠ Loan officer",
+		"❌ \"Processed credit memos\" (accounting) ≠ Credit analyst",
+		"❌ \"Managed supplier credit\" (procurement) ≠ Lending officer",
+	}
+
+	for _, example := range contextExamples {
+		if !strings.Contains(prompt, example) {
+			t.Errorf("Prompt missing context-aware keyword example: %q", example)
+		}
 	}
 }

@@ -168,7 +168,12 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString("4. MM/DD/YYYY → \"08/15/2025\" = August 15, 2025\n")
 	sb.WriteString("5. DD/MM/YYYY → \"15/08/2025\" = August 15, 2025\n")
 	sb.WriteString("6. Year only → \"2021\" = assume January-December 2021\n")
-	sb.WriteString("7. \"Present\", \"Current\", \"Ongoing\" → November 22, 2025\n\n")
+	sb.WriteString("7. \"Present\", \"Current\", \"Ongoing\" → November 22, 2025\n")
+	sb.WriteString("8. With apostrophes: \"Jan '21\", \"'21\"\n")
+	sb.WriteString("9. Ranges without months: \"2020-2024\" → assume full years\n")
+	sb.WriteString("10. Quarter format: \"Q1 2024\" → January 2024\n")
+	sb.WriteString("11. Fiscal year: \"FY 2024\" → treat as calendar 2024\n")
+	sb.WriteString("12. Approximate: \"circa 2020\", \"around 2021\" → use stated year\n\n")
 
 	sb.WriteString("**Date Range Separators:**\n")
 	sb.WriteString("- Recognize: \"-\", \"to\", \"–\", \"—\", \"until\", \"till\"\n")
@@ -225,49 +230,135 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString("- Dates: Look for patterns like MM/YYYY, might be right-aligned\n")
 	sb.WriteString("- Duties: Usually bullet points under job title\n\n")
 
-	sb.WriteString("### 3. JOB TITLE RELEVANCE CHECKING\n\n")
-	sb.WriteString("**Step 1: Extract Required Job Roles from Job Description**\n\n")
+	sb.WriteString("**SKILLS EXTRACTION STRATEGY:**\n\n")
+	sb.WriteString("Look for skills in MULTIPLE locations throughout the CV:\n")
+	sb.WriteString("1. Dedicated Skills/Competencies/Technical Skills section\n")
+	sb.WriteString("2. Embedded in job duties and responsibilities\n")
+	sb.WriteString("3. Listed in achievements and results\n")
+	sb.WriteString("4. Mentioned in education, certifications, or training\n")
+	sb.WriteString("5. Referenced in project descriptions\n\n")
+
+	sb.WriteString("**For THIS Specific Role, Extract Skills Related To:**\n\n")
+
+	// Dynamically extract skill categories from required experience
 	if len(jobDesc.RequiredExperience) > 0 {
-		sb.WriteString(fmt.Sprintf("For this job: \"%s\"\n", jobDesc.Title))
-		sb.WriteString("Required experience keywords: ")
-		for i := 0; i < min(3, len(jobDesc.RequiredExperience)); i++ {
-			if i > 0 {
-				sb.WriteString(", ")
-			}
-			sb.WriteString(jobDesc.RequiredExperience[i])
+		sb.WriteString("Required Experience Keywords:\n")
+		for i := 0; i < min(5, len(jobDesc.RequiredExperience)); i++ {
+			sb.WriteString(fmt.Sprintf("  • %s\n", jobDesc.RequiredExperience[i]))
 		}
-		sb.WriteString("\n\n")
+		sb.WriteString("\n")
 	}
 
-	sb.WriteString("**Step 2: Check CV for Matching Job Titles**\n\n")
-	sb.WriteString("STRONG MATCH (score 40-50/50 if meets years):\n")
-	sb.WriteString("- Exact match of required job titles or roles\n")
-	sb.WriteString("- Direct variation: \"Senior Loan Officer\", \"Group Lending Officer\"\n\n")
+	// Dynamically extract from required duties
+	if len(jobDesc.RequiredDuties) > 0 {
+		sb.WriteString("Required Duties Keywords:\n")
+		for i := 0; i < min(5, len(jobDesc.RequiredDuties)); i++ {
+			sb.WriteString(fmt.Sprintf("  • %s\n", jobDesc.RequiredDuties[i]))
+		}
+		sb.WriteString("\n")
+	}
 
-	sb.WriteString("MODERATE MATCH (score 25-35/50):\n")
-	sb.WriteString("- Adjacent role: \"Bank Officer\" (if duties show lending), \"Finance Officer\" (if duties show credit)\n")
-	sb.WriteString("- Must have lending duties listed, not just title\n\n")
+	sb.WriteString("**Skill Matching Instructions:**\n")
+	sb.WriteString("1. Identify the CORE skills needed for this role from the requirements above\n")
+	sb.WriteString("2. Search the CV for evidence of these skills in ANY section\n")
+	sb.WriteString("3. Accept synonyms, related tools, or equivalent technologies\n")
+	sb.WriteString("4. Weight hands-on experience higher than theoretical knowledge\n")
+	sb.WriteString("5. Look for DEPTH (years used, proficiency level) not just mentions\n\n")
 
-	sb.WriteString("WEAK MATCH (score 10-20/50):\n")
-	sb.WriteString("- Tangential: \"Bank Teller\", \"Finance Intern\", \"Accounts Officer\"\n")
-	sb.WriteString("- Financial role but no lending responsibilities\n\n")
+	sb.WriteString("### 3. JOB TITLE RELEVANCE CHECKING\n\n")
+	sb.WriteString("**Step 1: Extract Key Roles from THIS Job Description**\n\n")
+	sb.WriteString(fmt.Sprintf("Target Job Title: \"%s\"\n", jobDesc.Title))
 
-	sb.WriteString("NO MATCH (score 0-10/50):\n")
-	sb.WriteString("- Unrelated title: \"Supply Chain Manager\", \"Sales Representative\", \"Agriculture Officer\"\n")
-	sb.WriteString("- Even if they mention \"credit\" in passing (e.g., \"negotiated credit terms\" in sales)\n\n")
+	// Dynamically extract keywords from required experience
+	if len(jobDesc.RequiredExperience) > 0 {
+		sb.WriteString("Key experience requirements for this role:\n")
+		for i := 0; i < min(5, len(jobDesc.RequiredExperience)); i++ {
+			sb.WriteString(fmt.Sprintf("  - %s\n", jobDesc.RequiredExperience[i]))
+		}
+		sb.WriteString("\n")
+	}
 
-	sb.WriteString("**Step 3: Validate With Duties**\n\n")
-	sb.WriteString("Job title alone isn't enough. Check duties:\n")
-	sb.WriteString("- Loan Officer with duties: \"loan disbursement, group formation, VSLA\" → VALID\n")
-	sb.WriteString("- Finance Officer with duties: \"bookkeeping, invoicing, payments\" → NOT lending\n")
-	sb.WriteString("- Sales Rep with: \"negotiated credit terms\" → NOT lending (just payment terms)\n\n")
+	sb.WriteString("**Step 2: Semantic Job Title Matching**\n\n")
+	sb.WriteString("Match CV job titles to the target role using these criteria:\n\n")
 
-	sb.WriteString("**Critical: Keyword in wrong context ≠ Experience**\n")
-	sb.WriteString("❌ \"Negotiated credit terms with customers\" (sales) ≠ Loan officer\n")
-	sb.WriteString("❌ \"Processed credit memos\" (accounting) ≠ Credit analyst\n")
-	sb.WriteString("❌ \"Managed supplier credit\" (procurement) ≠ Lending officer\n\n")
+	sb.WriteString("STRONG MATCH (40-50/50 if meets duration):\n")
+	sb.WriteString(fmt.Sprintf("- Exact or near-exact match to \"%s\"\n", jobDesc.Title))
+	sb.WriteString("- Direct variations or synonyms of the target title\n")
+	sb.WriteString("- Different seniority levels of same role (e.g., Junior/Senior/Lead versions)\n")
+	sb.WriteString("- Job titles that perform the SAME core functions\n\n")
 
-	sb.WriteString("### 4. EXPERIENCE SCORING (0-50 points)\n\n")
+	sb.WriteString("MODERATE MATCH (25-35/50):\n")
+	sb.WriteString("- Adjacent/related roles in the same field\n")
+	sb.WriteString("- Roles that perform SOME of the required duties\n")
+	sb.WriteString("- Must show relevant duties in job description, not just title\n\n")
+
+	sb.WriteString("WEAK MATCH (10-20/50):\n")
+	sb.WriteString("- Tangentially related roles in similar industry\n")
+	sb.WriteString("- Same industry but different function\n")
+	sb.WriteString("- Transferable skills but different domain\n\n")
+
+	sb.WriteString("NO MATCH (0-10/50):\n")
+	sb.WriteString("- Completely unrelated job titles\n")
+	sb.WriteString("- Different industry and different function\n")
+	sb.WriteString("- No overlap in skills or responsibilities\n\n")
+
+	sb.WriteString("**Step 3: Validate With Duties Against Required Qualifications**\n\n")
+	sb.WriteString("CRITICAL: Job title alone is insufficient. Cross-check with required duties:\n\n")
+
+	// Dynamically reference actual required duties
+	if len(jobDesc.RequiredDuties) > 0 {
+		sb.WriteString("For THIS job, the CV must show experience with:\n")
+		for i := 0; i < min(5, len(jobDesc.RequiredDuties)); i++ {
+			sb.WriteString(fmt.Sprintf("  ✓ %s\n", jobDesc.RequiredDuties[i]))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("Validation Rules:\n")
+	sb.WriteString("- If CV shows matching title + matching duties → VALID, score based on duration\n")
+	sb.WriteString("- If CV shows matching title but WRONG duties → NOT VALID, max 15/50\n")
+	sb.WriteString("- If CV shows different title but MATCHING duties → Consider MODERATE match\n\n")
+
+	sb.WriteString("**Critical: Keyword in Wrong Context ≠ Experience**\n")
+	sb.WriteString("Example patterns to watch:\n")
+	sb.WriteString("❌ Keyword mentioned in passing (e.g., \"collaborated with X team\") ≠ X experience\n")
+	sb.WriteString("❌ Used tool/process incidentally ≠ Expertise in that area\n")
+	sb.WriteString("❌ Overlapping terminology from different context ≠ Relevant experience\n\n")
+
+	sb.WriteString("### 4. QUANTIFIED ACHIEVEMENT MATCHING\n\n")
+	sb.WriteString("**Scan for Numeric Achievements That Match Job Requirements:**\n\n")
+
+	// Dynamically build achievement matching from job description
+	sb.WriteString("Expected Outcomes from Job Description:\n")
+
+	// Extract numbers from required duties
+	if len(jobDesc.RequiredDuties) > 0 {
+		for _, duty := range jobDesc.RequiredDuties {
+			sb.WriteString(fmt.Sprintf("  • %s\n", duty))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("**Achievement Matching Logic:**\n\n")
+	sb.WriteString("1. Extract ALL numbers from CV: percentages, counts, currency, time periods\n")
+	sb.WriteString("2. Match CV numbers to job requirement numbers:\n")
+	sb.WriteString("   - Look for similar magnitude (if job needs 100, CV showing 80-150 is good)\n")
+	sb.WriteString("   - Look for same metric type (participants, retention %, revenue, etc.)\n")
+	sb.WriteString("   - Accept equivalent achievements (trained 200 = recruited 200)\n\n")
+
+	sb.WriteString("3. Give BONUS points for matching quantified achievements:\n")
+	sb.WriteString("   - Exact or close match: +8 to +10 points\n")
+	sb.WriteString("   - Exceeds requirement: +10 to +15 points\n")
+	sb.WriteString("   - Below requirement but reasonable: +3 to +5 points\n")
+	sb.WriteString("   - No matching numbers found: 0 bonus\n\n")
+
+	sb.WriteString("**Examples of Achievement Matching:**\n")
+	sb.WriteString("- Job requires: \"Manage team of 10\" | CV shows: \"Led team of 12\" → Strong match\n")
+	sb.WriteString("- Job requires: \"95% satisfaction\" | CV shows: \"Achieved 92% NPS\" → Good match\n")
+	sb.WriteString("- Job requires: \"Process 500 applications\" | CV shows: \"Processed 600+ monthly\" → Exceeds\n")
+	sb.WriteString("- Job requires: \"Increase revenue 20%\" | CV shows: \"Grew sales 35%\" → Strong evidence\n\n")
+
+	sb.WriteString("### 5. EXPERIENCE SCORING (0-50 points)\n\n")
 	sb.WriteString("**FIRST: Check Relevance (Job Title + Duties)**\n")
 	sb.WriteString("If NO relevant job title found → MAX 10 points regardless of years\n\n")
 
@@ -280,40 +371,127 @@ func (s *Scorer) buildScoringPrompt(applicant models.ApplicantDocument, jobDesc 
 	sb.WriteString("- 36-60 months: Senior → 40-45/50\n")
 	sb.WriteString("- 60+ months: Expert → 45-50/50\n\n")
 
-	sb.WriteString("**Scoring Examples for This Job:**\n\n")
+	sb.WriteString("**Scoring Examples for THIS Specific Job:**\n\n")
+	sb.WriteString(fmt.Sprintf("Job Title: \"%s\"\n", jobDesc.Title))
+
 	if len(jobDesc.RequiredExperience) > 0 {
-		sb.WriteString(fmt.Sprintf("Job requirement: \"%s\"\n\n", jobDesc.RequiredExperience[0]))
+		sb.WriteString(fmt.Sprintf("Key Requirement: \"%s\"\n\n", jobDesc.RequiredExperience[0]))
 	}
 
-	sb.WriteString("Example A:\n")
-	sb.WriteString("\"Loan Officer – ASA Kenya (08/2025-Present)\"\n")
-	sb.WriteString("Calculation: Aug 2025 to Nov 2025 = 3 months\n")
-	sb.WriteString("Category: Entry-level (0-6 months)\n")
-	sb.WriteString("Score: 22/50\n")
-	sb.WriteString("Reasoning: \"Highly relevant job title and duties, but only 3 months in role. Far short of multi-year requirement.\"\n\n")
+	sb.WriteString("Example A - Strong Match:\n")
+	sb.WriteString(fmt.Sprintf("CV shows: Job title matching \"%s\" or close variation\n", jobDesc.Title))
+	sb.WriteString("Duration: 3+ years in highly relevant role\n")
+	if len(jobDesc.RequiredDuties) > 0 {
+		sb.WriteString(fmt.Sprintf("Duties: Demonstrates \"%s\" and other required duties\n", jobDesc.RequiredDuties[0]))
+	}
+	sb.WriteString("Expected Score: 85-95/100\n")
+	sb.WriteString("Reasoning: \"Excellent match with required experience, education, and demonstrated duties.\"\n\n")
 
-	sb.WriteString("Example B:\n")
-	sb.WriteString("\"Supply Chain Manager (2015-Present)\"\n")
-	sb.WriteString("Calculation: 2015 to Nov 2025 = 120 months = 10 years\n")
-	sb.WriteString("Category: NOT RELEVANT (no lending job title)\n")
-	sb.WriteString("Score: 8/50\n")
-	sb.WriteString("Reasoning: \"10 years experience but in supply chain, not lending. No relevant job title or duties.\"\n\n")
+	sb.WriteString("Example B - Moderate Match:\n")
+	sb.WriteString("CV shows: Related but not identical job title\n")
+	sb.WriteString("Duration: 1-2 years in adjacent field\n")
+	sb.WriteString("Duties: Shows SOME required duties but missing critical ones\n")
+	sb.WriteString("Expected Score: 60-75/100\n")
+	sb.WriteString("Reasoning: \"Relevant experience but shorter duration and missing some key requirements.\"\n\n")
 
-	sb.WriteString("Example C:\n")
-	sb.WriteString("\"Microfinance Officer (2018-Present)\"\n")
-	sb.WriteString("Calculation: 2018 to Nov 2025 = 84 months = 7 years\n")
-	sb.WriteString("Category: Expert (60+ months)\n")
-	sb.WriteString("Score: 47/50\n")
-	sb.WriteString("Reasoning: \"7 years in microfinance, exceeding multi-year requirement.\"\n\n")
+	sb.WriteString("Example C - Weak Match:\n")
+	sb.WriteString("CV shows: Different job title, same industry\n")
+	sb.WriteString("Duration: 5+ years but in wrong function\n")
+	sb.WriteString("Duties: Minimal overlap with required duties\n")
+	sb.WriteString("Expected Score: 30-50/100\n")
+	sb.WriteString("Reasoning: \"Extensive experience but in unrelated role. Few transferable skills.\"\n\n")
 
-	sb.WriteString("Example D:\n")
-	sb.WriteString("\"Finance Officer (02/2021-06/2025)\" with duties: \"bank reconciliation, invoicing\"\n")
-	sb.WriteString("Calculation: 52 months = 4.3 years\n")
-	sb.WriteString("Category: NOT RELEVANT (no lending duties)\n")
-	sb.WriteString("Score: 12/50\n")
-	sb.WriteString("Reasoning: \"4.3 years but in general accounting, not lending. No credit/loan duties.\"\n\n")
+	sb.WriteString("Example D - No Match:\n")
+	sb.WriteString("CV shows: Unrelated industry and function\n")
+	sb.WriteString("Duration: Any duration\n")
+	sb.WriteString("Duties: No overlap with requirements\n")
+	sb.WriteString("Expected Score: 0-25/100\n")
+	sb.WriteString("Reasoning: \"No relevant experience for this position.\"\n\n")
 
-	sb.WriteString("### 5. ACCURACY CHECKS\n\n")
+	sb.WriteString("### 6. EDUCATION SCORING (0-20 points)\n\n")
+
+	// Check if education is actually required
+	hasRequiredEducation := len(jobDesc.RequiredEducation) > 0
+	hasNiceToHaveEducation := len(jobDesc.NiceToHaveEducation) > 0
+
+	if hasRequiredEducation {
+		sb.WriteString("**Education IS Required for This Role:**\n\n")
+		sb.WriteString("Required Education:\n")
+		for _, edu := range jobDesc.RequiredEducation {
+			sb.WriteString(fmt.Sprintf("  • %s\n", edu))
+		}
+		sb.WriteString("\n")
+
+		sb.WriteString("Scoring Guidelines:\n")
+		sb.WriteString("- Has ALL required education: 18-20/20\n")
+		sb.WriteString("- Has MOST required education: 12-17/20\n")
+		sb.WriteString("- Has SOME required education: 8-11/20\n")
+		sb.WriteString("- Missing required education: 0-7/20\n")
+		sb.WriteString("- PENALTY: -10 to -15 points for each missing required degree/certification\n\n")
+	} else {
+		sb.WriteString("**Education is NOT Explicitly Required (Field/Experience-Based Role):**\n\n")
+		sb.WriteString("Since no specific education is required, use flexible scoring:\n")
+		sb.WriteString("- Relevant degree/diploma: 15-20/20\n")
+		sb.WriteString("- Any higher education: 10-14/20\n")
+		sb.WriteString("- High school + strong experience: 8-12/20\n")
+		sb.WriteString("- High school only: 5-7/20\n")
+		sb.WriteString("- Prioritize EXPERIENCE over formal education for this role\n\n")
+	}
+
+	if hasNiceToHaveEducation {
+		sb.WriteString("Nice-to-Have Education (BONUS):\n")
+		for _, edu := range jobDesc.NiceToHaveEducation {
+			sb.WriteString(fmt.Sprintf("  • %s\n", edu))
+		}
+		sb.WriteString("- BONUS: +2 to +3 points each (max +5 total)\n\n")
+	}
+
+	sb.WriteString("### 7. DUTIES/RESPONSIBILITIES SCORING (0-20 points)\n\n")
+	sb.WriteString("**Evaluate Candidate's Ability to Perform Required Duties:**\n\n")
+
+	// List actual required duties
+	if len(jobDesc.RequiredDuties) > 0 {
+		sb.WriteString("REQUIRED Duties for This Role:\n")
+		for i, duty := range jobDesc.RequiredDuties {
+			sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, duty))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("**Scoring Method:**\n\n")
+	sb.WriteString("For EACH required duty:\n")
+	sb.WriteString("1. Search CV for evidence candidate has performed this duty\n")
+	sb.WriteString("2. Look for:\n")
+	sb.WriteString("   - Exact match: same duty described in CV\n")
+	sb.WriteString("   - Semantic match: similar duty with different wording\n")
+	sb.WriteString("   - Partial match: related but not identical duty\n\n")
+
+	sb.WriteString("3. Score based on evidence:\n")
+	sb.WriteString("   - Strong evidence (multiple examples): Full points for that duty\n")
+	sb.WriteString("   - Moderate evidence (one example): 60-80% points\n")
+	sb.WriteString("   - Weak evidence (indirect/implied): 30-50% points\n")
+	sb.WriteString("   - No evidence: 0 points + PENALTY -5 to -7 points\n\n")
+
+	sb.WriteString("**Calculate Total Duties Score:**\n")
+	totalDuties := len(jobDesc.RequiredDuties)
+	if totalDuties > 0 {
+		pointsPerDuty := 20.0 / float64(totalDuties)
+		sb.WriteString(fmt.Sprintf("- %d required duties = %.1f points each\n", totalDuties, pointsPerDuty))
+		sb.WriteString("- Sum the points for all duties\n")
+		sb.WriteString("- Subtract penalties for missing critical duties\n")
+		sb.WriteString("- Maximum score: 20 points\n\n")
+	}
+
+	// Optional: Nice-to-have duties
+	if len(jobDesc.NiceToHaveDuties) > 0 {
+		sb.WriteString("Nice-to-Have Duties (BONUS up to +3 points):\n")
+		for _, duty := range jobDesc.NiceToHaveDuties {
+			sb.WriteString(fmt.Sprintf("  • %s\n", duty))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("### 8. ACCURACY CHECKS\n\n")
 	sb.WriteString("**Date Validation:**\n")
 	sb.WriteString("✓ End date must be ≥ start date\n")
 	sb.WriteString("✓ Start date must be ≤ November 2025\n")
@@ -409,4 +587,12 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

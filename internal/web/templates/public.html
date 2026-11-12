@@ -1,0 +1,16 @@
+{{define "public"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="public">
+<header class="public-header"><a href="/careers" class="brand"><span class="brand-mark">S</span> {{.OrgName}} Careers</a></header>
+<main class="container narrow">
+{{template "content" .}}
+</main>
+<footer class="public-footer">© {{.OrgName}}</footer>
+</body>
+</html>{{end}}

@@ -1,0 +1,33 @@
+{{define "content"}}
+{{$d := .Data}}
+<p class="crumbs"><a href="/jobs">Jobs</a> / <a href="/jobs/{{$d.Job.ID}}">{{$d.Job.Title}}</a> /</p>
+<h1>Import from Gmail</h1>
+{{with $d.Status}}
+<section class="card" {{if .Running}}data-autorefresh="5"{{end}}>
+  <h2>{{if .Running}}Importing…{{else}}Last import{{end}}</h2>
+  <p class="small muted">Search: <code>{{.Query}}</code></p>
+  <p>{{.Processed}} of {{.Found}} emails checked · <strong>{{.Added}} added</strong> · {{.Skipped}} skipped (already imported or no CV attached)</p>
+  {{if .Errors}}<details><summary>{{len .Errors}} problem(s)</summary><ul class="small">{{range .Errors}}<li>{{.}}</li>{{end}}</ul></details>{{end}}
+  {{if not .Running}}<a class="btn" href="/jobs/{{$d.Job.ID}}">See applicants</a>{{end}}
+</section>
+{{end}}
+{{if not $d.Gmail}}
+<section class="card empty">
+  <h2>No inbox connected</h2>
+  <p>Connect the inbox that receives applications (for example careers@sinapis.org) in <a href="/settings">Settings</a>. Access is read-only.</p>
+</section>
+{{else}}
+<section class="card">
+  <p>Reads emails with attachments from <strong>{{$d.Gmail.AccountEmail}}</strong>. Each sender becomes one applicant (identified by email address, so people with the same name stay separate). If there's no cover letter attached, the email text is used as the cover letter. Emails already imported are skipped, so it's safe to run this again.</p>
+  <form method="post" action="/jobs/{{$d.Job.ID}}/import" class="stack">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="grid2">
+      <label>Subject contains <input name="subject" value="{{$d.DefaultSubject}}"></label>
+      <label>Received since <input type="date" name="since" value="{{$d.DefaultSince}}"></label>
+      <label>Maximum emails <input type="number" name="max" value="300" min="1" max="1000"></label>
+    </div>
+    <div><button class="btn btn-primary">Start import</button></div>
+  </form>
+</section>
+{{end}}
+{{end}}

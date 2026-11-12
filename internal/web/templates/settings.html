@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>Settings</h1>
+<section class="card">
+  <h2>Gmail inbox for applications</h2>
+  {{with .Data.Gmail}}
+    <p>Connected: <strong>{{.AccountEmail}}</strong> (read-only) since {{date .ConnectedAt}}.</p>
+    <form method="post" action="/settings/gmail/disconnect"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn">Disconnect</button></form>
+  {{else}}
+    <p>Connect the inbox that receives applications by email (for example careers@sinapis.org). Then use <em>Import from Gmail</em> on any job. The app only asks for read-only access, and the connection is stored encrypted.</p>
+    {{if .Data.Google}}<a class="btn btn-primary" href="/settings/gmail/connect">Connect Gmail</a>
+    {{else}}<p class="muted">Set up Google sign-in first (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).</p>{{end}}
+  {{end}}
+</section>
+<section class="card">
+  <h2>Posting to LinkedIn and BrighterMonday</h2>
+  <p>Neither site lets other apps post jobs for you, so each job has a <em>Post the job</em> page with ready-to-paste text and a tracked apply link per site.</p>
+</section>
+{{end}}

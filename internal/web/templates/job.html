@@ -1,0 +1,99 @@
+{{define "content"}}
+{{$d := .Data}}{{$j := $d.Job}}{{$csrf := .CSRF}}
+<div class="pagehead">
+  <div>
+    <p class="crumbs"><a href="/jobs">Jobs</a> /</p>
+    <h1>{{$j.Title}} <span class="pill pill-{{$j.Status}}">{{$j.Status}}</span></h1>
+    <p class="muted">{{$j.Department}}{{if $j.Department}} · {{end}}{{$j.Location}}{{if $j.ClosesOn}} · closes {{date $j.ClosesOn}}{{end}}
+      {{if $d.Open}} · <a href="{{$d.PublicURL}}" target="_blank" rel="noopener">public page ↗</a>{{end}}</p>
+  </div>
+  {{if .User.CanManageJobs}}
+  <div class="actions">
+    <a class="btn" href="/jobs/{{$j.ID}}/edit">Edit</a>
+    <a class="btn" href="/jobs/{{$j.ID}}/post">Post the job</a>
+    <a class="btn" href="/jobs/{{$j.ID}}/upload">Upload CVs</a>
+    <a class="btn" href="/jobs/{{$j.ID}}/import">Import from Gmail</a>
+    {{if eq $j.Status "open"}}
+      <form method="post" action="/jobs/{{$j.ID}}/status"><input type="hidden" name="csrf" value="{{$csrf}}"><input type="hidden" name="status" value="closed"><button class="btn">Close job</button></form>
+    {{else}}
+      <form method="post" action="/jobs/{{$j.ID}}/status"><input type="hidden" name="csrf" value="{{$csrf}}"><input type="hidden" name="status" value="open"><button class="btn btn-primary">Open job</button></form>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+
+<nav class="pipeline" aria-label="Pipeline">
+  <a href="?stage=active" {{if or (eq $d.StageParam "") (eq $d.StageParam "active")}}aria-current="true"{{end}}>Active <b>{{$j.Total}}</b></a>
+  {{range stages}}<a href="?stage={{.}}" {{if eq $d.StageParam .}}aria-current="true"{{end}}>{{stageLabel .}} <b>{{stageCount $j.StageCounts .}}</b></a>{{end}}
+  <a href="?stage=all" {{if eq $d.StageParam "all"}}aria-current="true"{{end}}>All</a>
+</nav>
+
+{{if $j.PendingCount}}
+<div class="flash flash-info" id="screening-status" data-status-url="/jobs/{{$j.ID}}/status.json" data-pending="{{$j.PendingCount}}">
+  The AI is screening {{$j.PendingCount}} application(s). Scores appear here as each one finishes — this page updates itself.
+</div>
+{{end}}
+
+<form method="get" class="filters">
+  <input type="hidden" name="stage" value="{{$d.StageParam}}">
+  <label>Search <input name="q" value="{{$d.Filter.Query}}" placeholder="Name or email"></label>
+  <label>Source
+    <select name="source"><option value="">Any</option>{{range sources}}<option value="{{.Value}}" {{if eq .Value $d.Filter.Source}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+  </label>
+  <label>Min score <input name="min" type="number" min="0" max="100" step="5" value="{{$d.Min}}" class="short"></label>
+  <button class="btn">Filter</button>
+  <a class="btn" href="/jobs/{{$j.ID}}/export.xlsx?{{$d.ExportQuery}}">Download Excel</a>
+</form>
+
+{{if not $d.Apps}}
+  <section class="card empty">
+    <h2>No applicants here yet</h2>
+    {{if eq $j.Status "open"}}<p>Share the job using <a href="/jobs/{{$j.ID}}/post">Post the job</a>, or add CVs you already have with <a href="/jobs/{{$j.ID}}/upload">Upload CVs</a>.</p>
+    {{else}}<p>Open the job to list it on the careers page, or upload CVs you already have.</p>{{end}}
+  </section>
+{{else}}
+<form method="post" action="/jobs/{{$j.ID}}/bulk" id="bulk">
+<input type="hidden" name="csrf" value="{{$csrf}}">
+<table class="table ranked">
+  <thead><tr>
+    <th class="sel"><input type="checkbox" data-select-all aria-label="Select all"></th>
+    <th class="num">#</th><th>Candidate</th><th class="num">Score</th>
+    <th class="num" title="Experience /50">Exp</th><th class="num" title="Education /20">Edu</th><th class="num" title="Duties /20">Duties</th><th class="num" title="Cover letter /10">CL</th>
+    <th>Match</th><th>Flags</th><th>Source</th><th>Stage</th>
+  </tr></thead>
+  <tbody>
+  {{range $d.Apps}}
+  <tr>
+    <td class="sel"><input type="checkbox" name="ids" value="{{.ID}}" aria-label="Select {{.Candidate.Name}}"></td>
+    <td class="num muted">{{.Rank}}</td>
+    <td><a href="/applications/{{.ID}}"><strong>{{if .Candidate.Name}}{{.Candidate.Name}}{{else}}Unnamed applicant{{end}}</strong></a>
+      <div class="muted small">{{.Candidate.Email}}{{if .Profile}}{{if .Profile.TotalMonths}} · {{years .Profile.TotalMonths}} yrs experience{{end}}{{end}}</div></td>
+    <td class="num"><span class="score {{scoreClass .ScoreTotal}}">{{score .ScoreTotal}}</span></td>
+    <td class="num">{{score .ScoreExperience}}</td><td class="num">{{score .ScoreEducation}}</td>
+    <td class="num">{{score .ScoreDuties}}</td><td class="num">{{score .ScoreCover}}</td>
+    <td>{{if .Scoring}}{{.Scoring.Band}}{{else}}<span class="muted">{{statusLabel .ScreeningStatus}}</span>{{end}}</td>
+    <td>{{if .WarningCount}}<span class="flagcount" title="Timeline warnings to check">⚠ {{.WarningCount}}</span>{{end}}</td>
+    <td class="small">{{sourceLabel .Source}}</td>
+    <td><span class="stage stage-{{.Stage}}">{{stageLabel .Stage}}</span></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+<div class="bulkbar">
+  <label>With selected
+    <select name="action">
+      <option value="">Choose…</option>
+      <option value="compare">Compare side by side</option>
+      {{range stages}}<option value="stage:{{.}}">Move to {{stageLabel .}}</option>{{end}}
+      <option value="rescreen">Screen again</option>
+    </select>
+  </label>
+  <label>Reason <span class="hint">(required to reject)</span> <input name="reason" maxlength="300"></label>
+  <button class="btn">Apply</button>
+</div>
+</form>
+<p class="small muted">Ranked by total score, then experience, duties, education and cover letter. Scores rank applicants for review — every stage change is a person's decision and is recorded.
+{{if .User.CanManageJobs}}</p>
+<form method="post" action="/jobs/{{$j.ID}}/rescreen" class="inline"><input type="hidden" name="csrf" value="{{$csrf}}"><button class="linkbtn small">Re-screen all applicants for this job</button></form>{{else}}</p>{{end}}
+{{end}}
+{{end}}

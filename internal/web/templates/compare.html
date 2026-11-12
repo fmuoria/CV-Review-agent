@@ -1,0 +1,26 @@
+{{define "content"}}
+{{$d := .Data}}
+<p class="crumbs"><a href="/jobs">Jobs</a> / <a href="/jobs/{{$d.Job.ID}}">{{$d.Job.Title}}</a> /</p>
+<h1>Compare candidates</h1>
+<div class="scroll">
+<table class="table compare">
+  <thead><tr><th></th>{{range $d.Apps}}<th><a href="/applications/{{.ID}}">{{if .Candidate.Name}}{{.Candidate.Name}}{{else}}Unnamed{{end}}</a></th>{{end}}</tr></thead>
+  <tbody>
+    <tr><th>Total</th>{{range $d.Apps}}<td><span class="score {{scoreClass .ScoreTotal}}">{{score .ScoreTotal}}</span></td>{{end}}</tr>
+    <tr><th>Match</th>{{range $d.Apps}}<td>{{if .Scoring}}{{.Scoring.Band}}{{end}}</td>{{end}}</tr>
+    <tr><th>Experience /50</th>{{range $d.Apps}}<td>{{score .ScoreExperience}}</td>{{end}}</tr>
+    <tr><th>Education /20</th>{{range $d.Apps}}<td>{{score .ScoreEducation}}</td>{{end}}</tr>
+    <tr><th>Duties /20</th>{{range $d.Apps}}<td>{{score .ScoreDuties}}</td>{{end}}</tr>
+    <tr><th>Cover letter /10</th>{{range $d.Apps}}<td>{{score .ScoreCover}}</td>{{end}}</tr>
+    <tr><th>Time in work</th>{{range $d.Apps}}<td>{{if .Profile}}{{months .Profile.TotalMonths}}{{end}}</td>{{end}}</tr>
+    <tr><th>Warnings</th>{{range $d.Apps}}<td>{{if .WarningCount}}⚠ {{.WarningCount}}{{else}}—{{end}}</td>{{end}}</tr>
+    <tr><th>Stage</th>{{range $d.Apps}}<td><span class="stage stage-{{.Stage}}">{{stageLabel .Stage}}</span></td>{{end}}</tr>
+    <tr class="section"><th colspan="{{add (len $d.Apps) 1}}">Required items</th></tr>
+    {{range $d.Rows}}<tr><th class="req">{{.Requirement}}</th>{{range .Met}}<td class="met met-{{.}}">{{if eq . "—"}}—{{else}}{{metIcon .}}{{end}}</td>{{end}}</tr>{{end}}
+    <tr class="section"><th colspan="{{add (len $d.Apps) 1}}">Summary</th></tr>
+    <tr><th></th>{{range $d.Apps}}<td class="small">{{if .Scoring}}{{.Scoring.Summary}}{{end}}</td>{{end}}</tr>
+  </tbody>
+</table>
+</div>
+<p class="small muted">✓ evidenced · Partly = some evidence · ✗ not found in the CV</p>
+{{end}}

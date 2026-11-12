@@ -1,0 +1,7 @@
+{{define "content"}}
+<section class="card empty">
+  {{if .Data.Missing}}<h1>Role not found</h1><p>This role may have been filled or removed.</p>
+  {{else}}<h1>Applications have closed</h1><p>Applications for {{.Data.Job.Title}} are no longer being accepted.</p>{{end}}
+  <p><a href="/careers">See open roles</a></p>
+</section>
+{{end}}

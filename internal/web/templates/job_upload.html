@@ -1,0 +1,24 @@
+{{define "content"}}
+{{$d := .Data}}
+<p class="crumbs"><a href="/jobs">Jobs</a> / <a href="/jobs/{{$d.Job.ID}}">{{$d.Job.Title}}</a> /</p>
+<h1>Upload CVs</h1>
+<section class="card">
+  <p>Use this for CVs you already have — downloaded from BrighterMonday, received on WhatsApp, or handed over at an event. Each file becomes one applicant; the AI reads the name, email and phone from the CV.</p>
+  <p class="small muted">To pair a cover letter with its CV, name them like <code>JaneWanjiru_CV.pdf</code> and <code>JaneWanjiru_CoverLetter.pdf</code>. PDF, Word, text and photos of CVs are accepted, up to {{$d.MaxMB}} MB each.</p>
+  <form method="post" action="/jobs/{{$d.Job.ID}}/upload" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label>Files <input type="file" name="files" multiple required accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"></label>
+    <label>Where did these come from?
+      <select name="source">
+        <option value="brightermonday">BrighterMonday</option>
+        <option value="upload" selected>Uploaded by HR</option>
+        <option value="referral">Referral</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <div><button class="btn btn-primary">Upload and screen</button></div>
+  </form>
+  <p class="small muted">These candidates didn't see the privacy notice on the careers form. Make sure they've been told how Sinapis uses their data (for example in your BrighterMonday advert or a reply email).</p>
+</section>
+{{end}}

@@ -1,0 +1,51 @@
+{{define "content"}}
+{{$d := .Data}}{{$j := $d.Job}}
+<p class="crumbs"><a href="/careers?src={{$d.Src}}">All roles</a></p>
+<h1>{{$j.Title}}</h1>
+<p class="muted">{{$j.Location}}{{if $j.EmploymentType}} · {{$j.EmploymentType}}{{end}}{{if $j.ClosesOn}} · Apply by {{date $j.ClosesOn}}{{end}}</p>
+{{with $j.Summary}}<p class="lead">{{.}}</p>{{end}}
+{{with $j.Description}}<p class="prewrap">{{.}}</p>{{end}}
+{{if $j.RequiredDuties}}<h2>What you'll do</h2><ul>{{range $j.RequiredDuties}}<li>{{.}}</li>{{end}}</ul>{{end}}
+{{if or $j.RequiredExperience $j.RequiredEducation}}<h2>What you'll bring</h2><ul>{{range $j.RequiredExperience}}<li>{{.}}</li>{{end}}{{range $j.RequiredEducation}}<li>{{.}}</li>{{end}}</ul>{{end}}
+{{if or $j.NiceExperience $j.NiceEducation $j.NiceDuties}}<h2>It's a bonus if you have</h2><ul>{{range $j.NiceExperience}}<li>{{.}}</li>{{end}}{{range $j.NiceEducation}}<li>{{.}}</li>{{end}}{{range $j.NiceDuties}}<li>{{.}}</li>{{end}}</ul>{{end}}
+
+{{if not $d.Open}}
+<section class="card"><h2>Applications are closed</h2><p>Thank you for your interest. See our <a href="/careers">other roles</a>.</p></section>
+{{else}}
+<section class="card" id="apply">
+<h2>Apply</h2>
+{{if $d.Errors}}<div class="flash flash-error" role="alert"><ul>{{range $d.Errors}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+<form method="post" action="/careers/{{$j.Slug}}#apply" enctype="multipart/form-data" class="stack">
+  <input type="hidden" name="token" value="{{$d.Token}}">
+  <input type="hidden" name="src" value="{{$d.Src}}">
+  <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website_url" tabindex="-1" autocomplete="off"></label></div>
+  <div class="grid2">
+    <label>Full name <input name="name" value="{{index $d.Values "name"}}" required autocomplete="name"></label>
+    <label>Email <input type="email" name="email" value="{{index $d.Values "email"}}" required autocomplete="email"></label>
+    <label>Phone <input name="phone" value="{{index $d.Values "phone"}}" autocomplete="tel" placeholder="+254…"></label>
+    <label>Where are you based? <input name="location" value="{{index $d.Values "location"}}" placeholder="City, country"></label>
+  </div>
+  <label>LinkedIn profile link <span class="hint">Optional</span>
+    <input name="linkedin_url" value="{{index $d.Values "linkedin_url"}}" placeholder="https://www.linkedin.com/in/your-name"></label>
+  <label>CV <span class="hint">PDF or Word, up to {{$d.MaxMB}} MB</span>
+    <input type="file" name="cv" required accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"></label>
+  <label>Cover letter file <span class="hint">Optional — or write it below</span>
+    <input type="file" name="cover_file" accept=".pdf,.doc,.docx,.txt"></label>
+  <label>Cover letter <span class="hint">Why this role, and why {{.OrgName}}?</span>
+    <textarea name="cover_text" rows="7">{{index $d.Values "cover_text"}}</textarea></label>
+  <label>LinkedIn profile as PDF <span class="hint">Optional. On LinkedIn: your profile → More (or Resources) → Save to PDF</span>
+    <input type="file" name="linkedin_pdf" accept=".pdf"></label>
+  {{range $i, $q := $j.Questions}}
+    <label>{{$q}} <textarea name="q{{$i}}" rows="4" required>{{index $d.Answers $i}}</textarea></label>
+  {{end}}
+  <div class="privacy">
+    <h3>How we use your information</h3>
+    <p>{{.OrgName}} uses the information and documents you send only to assess your application for this and similar roles. AI tools help our team read and organise applications; <strong>every decision about your application is made by a person</strong>. Your information is stored securely with our service providers, which may be located outside your country, and is kept for up to 12 months after the recruitment closes unless you join our talent pool.
+    You can ask to see, correct or delete your information at any time{{with $d.PrivacyEmail}} by writing to <a href="mailto:{{.}}">{{.}}</a>{{end}}.</p>
+    <label class="check"><input type="checkbox" name="consent" value="yes" required> I have read how my information will be used.</label>
+  </div>
+  <div><button class="btn btn-primary">Submit application</button></div>
+</form>
+</section>
+{{end}}
+{{end}}

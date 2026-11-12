@@ -1,43 +1,19 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git
-
-# Set working directory
-WORKDIR /app
-
-# Copy go mod files
+# --- Build -------------------------------------------------------------------
+FROM golang:1.24-alpine AS build
+WORKDIR /src
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
-
-# Copy source code
 COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o cv-review-agent .
-
-# Runtime stage
-FROM alpine:latest
-
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-# Copy binary from builder
-COPY --from=builder /app/cv-review-agent .
-
-# Create uploads directory
-RUN mkdir -p uploads
-
-# Expose port
+# --- Run ---------------------------------------------------------------------
+FROM alpine:3.20
+# poppler-utils provides pdftotext (fast, free PDF text extraction).
+# Scanned PDFs that have no text layer are read by Gemini instead.
+RUN apk add --no-cache ca-certificates poppler-utils && \
+    adduser -D -u 10001 app && mkdir -p /var/data && chown app /var/data
+COPY --from=build /out/server /usr/local/bin/server
+USER app
+ENV PORT=8080 STORAGE_DIR=/var/data/files
 EXPOSE 8080
-
-# Set environment variables (can be overridden)
-ENV PORT=8080
-
-# Run the application
-CMD ["./cv-review-agent"]
+CMD ["server"]

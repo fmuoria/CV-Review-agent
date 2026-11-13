@@ -1,0 +1,31 @@
+{{define "content"}}
+{{$csrf := .CSRF}}{{$me := .User.ID}}
+<h1>People with access</h1>
+<section class="card">
+  <h2>Add someone</h2>
+  <p class="small muted">They sign in with their Google account{{with .Data.Domain}} (@{{.}}){{end}}. <strong>HR</strong> can create jobs and see every applicant. <strong>Hiring managers</strong> only see the jobs they're added to. <strong>Admins</strong> can also manage access.</p>
+  <form method="post" action="/admin/users" class="inline-form">
+    <input type="hidden" name="csrf" value="{{$csrf}}">
+    <label>Email <input type="email" name="email" required></label>
+    <label>Name <input name="name"></label>
+    <label>Role <select name="role">{{range roles}}<option value="{{.Value}}" {{if eq .Value "hiring_manager"}}selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+    <button class="btn btn-primary">Add</button>
+  </form>
+</section>
+<table class="table">
+  <thead><tr><th>Person</th><th>Role</th><th>Active</th><th>Last sign-in</th><th></th></tr></thead>
+  <tbody>
+  {{range .Data.Users}}
+  <tr>
+    <form method="post" action="/admin/users/{{.ID}}">
+    <td><input type="hidden" name="csrf" value="{{$csrf}}"><input name="name" value="{{.Name}}" placeholder="Name" class="compact"><div class="small muted">{{.Email}}</div></td>
+    <td>{{$role := .Role}}<select name="role">{{range roles}}<option value="{{.Value}}" {{if eq .Value $role}}selected{{end}}>{{.Label}}</option>{{end}}</select></td>
+    <td><select name="active"><option value="yes" {{if .Active}}selected{{end}}>Yes</option><option value="no" {{if not .Active}}selected{{end}}>No</option></select></td>
+    <td class="small">{{if .LastLoginAt}}{{date .LastLoginAt}}{{else}}<span class="muted">Never</span>{{end}}</td>
+    <td><button class="btn">Save</button>{{if eq .ID $me}} <span class="small muted">(you)</span>{{end}}</td>
+    </form>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

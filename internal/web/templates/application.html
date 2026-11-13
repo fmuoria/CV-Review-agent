@@ -1,0 +1,148 @@
+{{define "content"}}
+{{$d := .Data}}{{$a := $d.App}}{{$csrf := .CSRF}}
+<p class="crumbs"><a href="/jobs">Jobs</a> / <a href="/jobs/{{$a.JobID}}">{{$a.JobTitle}}</a> /</p>
+<div class="pagehead">
+  <div>
+    <h1>{{$d.Name}}</h1>
+    <p class="muted">
+      {{with $a.Candidate.Email}}<a href="mailto:{{.}}">{{.}}</a>{{end}}
+      {{with $a.Candidate.Phone}} · {{.}}{{end}}
+      {{with $a.Candidate.Location}} · {{.}}{{end}}
+      {{with $a.Candidate.LinkedInURL}}{{with safeURL .}} · <a href="{{.}}" target="_blank" rel="noopener">LinkedIn profile ↗</a>{{end}}{{end}}
+    </p>
+    <p class="small muted">Applied {{date $a.CreatedAt}} via {{sourceLabel $a.Source}} ·
+      {{if $a.ConsentAt}}Privacy notice accepted {{date $a.ConsentAt}}{{else}}Privacy notice not recorded (added by HR or imported from email){{end}}</p>
+  </div>
+  <div class="actions">
+    {{if $d.Prev}}<a class="btn" href="/applications/{{$d.Prev}}">← Previous</a>{{end}}
+    {{if $d.Next}}<a class="btn" href="/applications/{{$d.Next}}">Next →</a>{{end}}
+  </div>
+</div>
+
+<div class="layout2">
+<div class="maincol">
+
+<section class="card">
+  <div class="cardhead">
+    <h2>AI screening</h2>
+    <form method="post" action="/applications/{{$a.ID}}/rescreen"><input type="hidden" name="csrf" value="{{$csrf}}"><button class="linkbtn small">Screen again</button></form>
+  </div>
+  {{if eq $a.ScreeningStatus "done"}}{{with $a.Scoring}}
+    <div class="scorehead">
+      <div class="bigscore {{scoreClass $a.ScoreTotal}}">{{num .Total}}<small>/100</small></div>
+      <div><strong>{{.Band}}</strong><p>{{.Summary}}</p></div>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>Experience</span><div class="track"><div class="fill w{{pctf .Experience 50}}"></div></div><b>{{num .Experience}}/50</b></div>
+      <p class="reason">{{.ExperienceReasoning}}</p>
+      <div class="bar"><span>Education</span><div class="track"><div class="fill w{{pctf .Education 20}}"></div></div><b>{{num .Education}}/20</b></div>
+      <p class="reason">{{.EducationReasoning}}</p>
+      <div class="bar"><span>Duties</span><div class="track"><div class="fill w{{pctf .Duties 20}}"></div></div><b>{{num .Duties}}/20</b></div>
+      <p class="reason">{{.DutiesReasoning}}</p>
+      <div class="bar"><span>Cover letter</span><div class="track"><div class="fill w{{pctf .CoverLetter 10}}"></div></div><b>{{num .CoverLetter}}/10</b></div>
+      <p class="reason">{{.CoverLetterReasoning}}</p>
+    </div>
+    <div class="grid2">
+      {{if .Strengths}}<div><h3>Strengths</h3><ul>{{range .Strengths}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+      {{if .Gaps}}<div><h3>Gaps to probe at interview</h3><ul>{{range .Gaps}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+    </div>
+    {{if .RequiredChecks}}
+    <h3>Required items</h3>
+    <table class="table checks-table">
+      <thead><tr><th></th><th>Requirement</th><th>Evidence in the CV</th></tr></thead>
+      <tbody>{{range .RequiredChecks}}
+        <tr><td class="met met-{{.Met}}" title="{{.Met}}">{{metIcon .Met}}</td><td>{{.Requirement}}</td><td class="small">{{.Evidence}}</td></tr>
+      {{end}}</tbody>
+    </table>
+    {{end}}
+    <p class="small muted">Scored {{date $a.ScoredAt}} by {{$a.Model}} (prompt {{$a.PromptVersion}}).{{if .Clamped}} The AI returned an out-of-range score, which was capped.{{end}} The AI can be wrong — check the evidence against the CV before deciding.</p>
+  {{end}}
+  {{else if eq $a.ScreeningStatus "needs_review"}}
+    <div class="flash flash-error">{{$a.ScreeningError}}</div>
+  {{else if eq $a.ScreeningStatus "failed"}}
+    <div class="flash flash-error">Screening failed after several attempts: {{$a.ScreeningError}}</div>
+  {{else}}
+    <p class="muted" data-autorefresh="10">Waiting for the AI to read this application… this page will refresh.</p>
+  {{end}}
+</section>
+
+{{if $a.Flags}}
+<section class="card">
+  <h2>Things to check</h2>
+  <p class="small muted">Calculated from the dates on the CV. These never change the score — they are prompts for your review or the interview.</p>
+  <ul class="flags">{{range $a.Flags}}<li class="flag-{{.Severity}}">{{if eq .Severity "warning"}}⚠{{else}}ℹ{{end}} {{.Message}}</li>{{end}}</ul>
+</section>
+{{end}}
+
+{{with $a.Profile}}
+<section class="card">
+  <h2>Experience timeline <span class="muted small">{{months .TotalMonths}} in total</span></h2>
+  {{if .Employment}}
+  <table class="table">
+    <thead><tr><th>Role</th><th>Employer</th><th>Dates</th><th class="num">Length</th></tr></thead>
+    <tbody>{{range .Employment}}
+      <tr><td>{{.Title}}{{if .FullTime}}{{if not (deref .FullTime)}} <span class="muted small">(not full-time)</span>{{end}}{{end}}</td><td>{{.Employer}}</td>
+      <td>{{if .DatesValid}}{{.StartLabel}} – {{.EndLabel}}{{else}}<span class="muted">{{.Start}} – {{.End}}</span>{{end}}</td>
+      <td class="num">{{if .DatesValid}}{{months .DurationMonths}}{{end}}</td></tr>
+    {{end}}</tbody>
+  </table>
+  {{else}}<p class="muted">No employment history could be read.</p>{{end}}
+  {{if .Education}}<h3>Education</h3><ul>{{range .Education}}<li>{{.Qualification}}{{with .Field}}, {{.}}{{end}}{{with .Institution}} — {{.}}{{end}}{{with .Year}} ({{.}}){{end}}</li>{{end}}</ul>{{end}}
+  {{if .Certifications}}<h3>Certifications</h3><ul>{{range .Certifications}}<li>{{.}}</li>{{end}}</ul>{{end}}
+</section>
+{{end}}
+
+{{if or $a.Answers $a.CoverText}}
+<section class="card">
+  <h2>Application</h2>
+  {{range $a.Answers}}<h3>{{.Question}}</h3><p class="prewrap">{{.Answer}}</p>{{end}}
+  {{with $a.CoverText}}<h3>Cover letter</h3><p class="prewrap">{{.}}</p>{{end}}
+</section>
+{{end}}
+
+<section class="card">
+  <h2>Documents</h2>
+  {{if not $d.Docs}}<p class="muted">No files.</p>{{end}}
+  <ul class="docs">{{range $d.Docs}}
+    <li>
+      <a href="/documents/{{.ID}}">{{.Filename}}</a> <span class="muted small">{{.Kind}} · {{.Extraction}}</span>
+      {{if eq .ContentType "application/pdf"}} · <a class="small" href="/documents/{{.ID}}?inline=1" target="_blank" rel="noopener">view</a>{{end}}
+      {{if .TextContent}}<details><summary class="small">Text the AI read</summary><pre class="doctext">{{.TextContent}}</pre></details>{{end}}
+    </li>
+  {{end}}</ul>
+</section>
+</div>
+
+<aside class="sidecol">
+<section class="card">
+  <h2>Stage</h2>
+  <p><span class="stage stage-{{$a.Stage}}">{{stageLabel $a.Stage}}</span></p>
+  <form method="post" action="/applications/{{$a.ID}}/stage" class="stack">
+    <input type="hidden" name="csrf" value="{{$csrf}}">
+    <label>Move to
+      <select name="stage">{{range stages}}<option value="{{.}}" {{if eq . $a.Stage}}selected{{end}}>{{stageLabel .}}</option>{{end}}</select>
+    </label>
+    <label>Reason <span class="hint">(required to reject)</span><textarea name="reason" rows="2" maxlength="300"></textarea></label>
+    <button class="btn btn-primary">Update stage</button>
+  </form>
+</section>
+
+<section class="card" id="notes">
+  <h2>Notes</h2>
+  <form method="post" action="/applications/{{$a.ID}}/notes" class="stack">
+    <input type="hidden" name="csrf" value="{{$csrf}}">
+    <textarea name="body" rows="3" placeholder="Visible to everyone working on this job" required></textarea>
+    <button class="btn">Add note</button>
+  </form>
+  {{range $d.Notes}}<div class="note"><p class="prewrap">{{.Body}}</p><p class="small muted">{{.AuthorName}} · {{datetime .CreatedAt}}</p></div>{{end}}
+</section>
+
+<section class="card">
+  <h2>History</h2>
+  <ol class="history">{{range $d.Events}}
+    <li><span>{{eventText .}}</span><span class="small muted">{{if .ActorName}}{{.ActorName}} · {{end}}{{datetime .CreatedAt}}</span></li>
+  {{end}}</ol>
+</section>
+</aside>
+</div>
+{{end}}

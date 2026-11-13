@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="pagehead">
+  <h1>Jobs</h1>
+  {{if .User.CanManageJobs}}<a class="btn btn-primary" href="/jobs/new">New job</a>{{end}}
+</div>
+{{if not .Data.Jobs}}
+  <section class="card empty">
+    <h2>No jobs yet</h2>
+    {{if .User.CanManageJobs}}<p>Create a job from a role template, then open it to start receiving applications.</p><a class="btn btn-primary" href="/jobs/new">Create the first job</a>
+    {{else}}<p>You haven't been added to any jobs yet. HR adds hiring managers to the jobs they're hiring for.</p>{{end}}
+  </section>
+{{else}}
+<table class="table">
+  <thead><tr><th>Job</th><th>Status</th><th class="num">Applicants</th><th class="num">Shortlisted</th><th class="num">Interview</th><th class="num">Hired</th><th>Closes</th></tr></thead>
+  <tbody>
+  {{range .Data.Jobs}}
+    <tr>
+      <td><a href="/jobs/{{.ID}}"><strong>{{.Title}}</strong></a><div class="muted small">{{.Department}}{{if and .Department .Location}} · {{end}}{{.Location}}</div></td>
+      <td><span class="pill pill-{{.Status}}">{{.Status}}</span></td>
+      <td class="num">{{.Total}}{{if .PendingCount}} <span class="muted small">({{.PendingCount}} screening)</span>{{end}}</td>
+      <td class="num">{{stageCount .StageCounts "shortlisted"}}</td>
+      <td class="num">{{stageCount .StageCounts "interview"}}</td>
+      <td class="num">{{stageCount .StageCounts "hired"}}</td>
+      <td>{{date .ClosesOn}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

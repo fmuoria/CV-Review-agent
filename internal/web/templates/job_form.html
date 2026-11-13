@@ -1,0 +1,69 @@
+{{define "content"}}
+{{$d := .Data}}{{$j := $d.Job}}
+<div class="pagehead">
+  <h1>{{if $d.IsNew}}New job{{else}}Edit {{$j.Title}}{{end}}</h1>
+  {{if not $d.IsNew}}<a class="btn" href="/jobs/{{$j.ID}}">Cancel</a>{{end}}
+</div>
+{{if $d.IsNew}}
+<form method="get" action="/jobs/new" class="card inline-form">
+  <label>Start from a role template
+    <select name="template">
+      {{range $d.Templates}}<option value="{{.Key}}" {{if eq .Key $d.Template}}selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </label>
+  <button class="btn">Load template</button>
+  <p class="small muted">Templates are starting points. Edit every list to match this vacancy — the AI scores candidates only against what you write here.</p>
+</form>
+{{end}}
+{{if $d.Errors}}<div class="flash flash-error"><ul>{{range $d.Errors}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+<form method="post" action="{{if $d.IsNew}}/jobs{{else}}/jobs/{{$j.ID}}{{end}}" class="card stack">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <input type="hidden" name="role_family" value="{{$j.RoleFamily}}">
+  <div class="grid2">
+    <label>Job title <input name="title" value="{{$j.Title}}" required></label>
+    <label>Department <input name="department" value="{{$j.Department}}" placeholder="e.g. Programmes"></label>
+    <label>Location <input name="location" value="{{$j.Location}}"></label>
+    <label>Country
+      <select name="country">{{range $d.Countries}}<option value="{{.Code}}" {{if eq .Code $j.Country}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+    </label>
+    <label>Employment type <input name="employment_type" value="{{$j.EmploymentType}}" placeholder="Full-time, Contract, Internship…"></label>
+    <label>Closing date <input type="date" name="closes_on" value="{{isodate $j.ClosesOn}}"></label>
+  </div>
+  <label>Summary <span class="hint">One or two sentences shown at the top of the ad.</span>
+    <textarea name="summary" rows="2">{{$j.Summary}}</textarea></label>
+  <label>About the role <span class="hint">Context, team, reporting line, what success looks like.</span>
+    <textarea name="description" rows="5">{{$j.Description}}</textarea></label>
+
+  <h2>Requirements</h2>
+  <p class="muted small">One item per line. <strong>Required</strong> items carry the most weight in AI scoring; missing one is a major deduction. <strong>Nice-to-have</strong> items have minor impact.</p>
+  <div class="grid2">
+    <label>Required experience <textarea name="required_experience" rows="5">{{lines $j.RequiredExperience}}</textarea></label>
+    <label>Nice-to-have experience <textarea name="nice_experience" rows="5">{{lines $j.NiceExperience}}</textarea></label>
+    <label>Required education <textarea name="required_education" rows="3">{{lines $j.RequiredEducation}}</textarea></label>
+    <label>Nice-to-have education <textarea name="nice_education" rows="3">{{lines $j.NiceEducation}}</textarea></label>
+    <label>Required duties <textarea name="required_duties" rows="6">{{lines $j.RequiredDuties}}</textarea></label>
+    <label>Nice-to-have duties <textarea name="nice_duties" rows="6">{{lines $j.NiceDuties}}</textarea></label>
+  </div>
+  <label>Extra application questions <span class="hint">Optional, one per line, up to five. Answers are scored together with the cover letter.</span>
+    <textarea name="questions" rows="3">{{lines $j.Questions}}</textarea></label>
+
+  <h2>Hiring managers</h2>
+  {{if $d.Managers}}
+  <p class="muted small">Hiring managers only see the jobs they're added to. HR and admins see every job.</p>
+  <div class="checks">
+    {{range $d.Managers}}<label class="check"><input type="checkbox" name="members" value="{{.ID}}" {{if contains $d.Members .ID}}checked{{end}}> {{.DisplayName}}</label>{{end}}
+  </div>
+  {{else}}<p class="muted small">No hiring managers have been added yet. An admin can add them under People.</p>{{end}}
+
+  <div class="grid2">
+    <label>Status
+      <select name="status">
+        <option value="draft" {{if eq $j.Status "draft"}}selected{{end}}>Draft — not visible</option>
+        <option value="open" {{if eq $j.Status "open"}}selected{{end}}>Open — on the careers page</option>
+        <option value="closed" {{if eq $j.Status "closed"}}selected{{end}}>Closed</option>
+      </select>
+    </label>
+  </div>
+  <div><button class="btn btn-primary">{{if $d.IsNew}}Create job{{else}}Save changes{{end}}</button></div>
+</form>
+{{end}}

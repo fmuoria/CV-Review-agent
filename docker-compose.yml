@@ -1,24 +1,28 @@
-version: '3.8'
-
+# Local development: Postgres + the app in demo-AI mode.
+#   docker compose up --build      then open http://localhost:8080
 services:
-  cv-review-agent:
-    build: .
-    ports:
-      - "8080:8080"
+  db:
+    image: postgres:16-alpine
     environment:
-      - PORT=8080
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-us-central1}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/key.json
-    volumes:
-      # Mount service account key (create this locally)
-      - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/credentials/key.json:ro
-      # Mount uploads directory for persistence
-      - ./uploads:/root/uploads
-    restart: unless-stopped
+      POSTGRES_USER: ats
+      POSTGRES_PASSWORD: ats
+      POSTGRES_DB: ats
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      test: ["CMD-SHELL", "pg_isready -U ats"]
+      interval: 3s
+      retries: 20
+  app:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8080:8080"]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://ats:ats@db:5432/ats?sslmode=disable
+      STORAGE_DIR: /var/data/files
+    volumes: [files:/var/data]
+volumes:
+  dbdata:
+  files:

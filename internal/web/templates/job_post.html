@@ -1,0 +1,26 @@
+{{define "content"}}
+{{$d := .Data}}
+<p class="crumbs"><a href="/jobs">Jobs</a> / <a href="/jobs/{{$d.Job.ID}}">{{$d.Job.Title}}</a> /</p>
+<h1>Post the job</h1>
+{{if not $d.Open}}<div class="flash flash-error">This job isn't open yet, so its apply links won't accept applications. Open it from the job page first.</div>{{end}}
+<p class="muted">Each channel gets its own apply link, so you can see where applicants came from. LinkedIn and BrighterMonday don't allow other apps to post for you, so copy the text into each site — it takes about two minutes per site.</p>
+{{range $d.Copies}}
+<section class="card">
+  <div class="cardhead">
+    <h2>{{.Channel.Label}}</h2>
+    {{if .Channel.PostURL}}<a class="btn" href="{{.Channel.PostURL}}" target="_blank" rel="noopener">Open {{.Channel.Label}} ↗</a>{{end}}
+  </div>
+  <p class="small">{{.Channel.Instructions}}</p>
+  <label>Apply link
+    <span class="copyrow"><input readonly value="{{.ApplyURL}}" id="url-{{.Channel.Key}}"><button type="button" class="btn" data-copy="url-{{.Channel.Key}}">Copy</button></span>
+  </label>
+  <label>Title
+    <span class="copyrow"><input readonly value="{{.Title}}" id="title-{{.Channel.Key}}"><button type="button" class="btn" data-copy="title-{{.Channel.Key}}">Copy</button></span>
+  </label>
+  <label>Description
+    <textarea readonly rows="10" id="body-{{.Channel.Key}}">{{.Body}}</textarea>
+  </label>
+  <button type="button" class="btn" data-copy="body-{{.Channel.Key}}">Copy description</button>
+</section>
+{{end}}
+{{end}}

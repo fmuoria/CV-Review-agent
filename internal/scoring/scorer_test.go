@@ -1,574 +1,163 @@
 package scoring
 
 import (
+	"context"
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
-	"github.com/fmuoria/CV-Review-agent/internal/models"
+	"github.com/fmuoria/CV-Review-agent/internal/llm"
 )
 
-// TestSanitizeUTF8_ValidString tests that valid UTF-8 strings are returned unchanged
-func TestSanitizeUTF8_ValidString(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{
-			name:  "Simple ASCII text",
-			input: "Hello, World!",
-		},
-		{
-			name:  "UTF-8 with special characters",
-			input: "José González - Software Engineer with 5+ years of experience in Go, Python, and Java.",
-		},
-		{
-			name:  "UTF-8 with emoji",
-			input: "Experienced developer 🚀 with strong communication skills 💻",
-		},
-		{
-			name:  "Multi-language text",
-			input: "Software Engineer - 软件工程师 - مهندس برمجيات",
-		},
-		{
-			name:  "Empty string",
-			input: "",
-		},
-	}
+type fakeAI struct {
+	answer string
+	got    llm.Request
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeUTF8(tt.input)
-			if result != tt.input {
-				t.Errorf("sanitizeUTF8() changed valid UTF-8 string: got %q, want %q", result, tt.input)
-			}
-			if !utf8.ValidString(result) {
-				t.Errorf("sanitizeUTF8() returned invalid UTF-8 string")
-			}
-		})
+func (f *fakeAI) Generate(_ context.Context, r llm.Request) (llm.Response, error) {
+	f.got = r
+	return llm.Response{Text: f.answer}, nil
+}
+func (f *fakeAI) Model() string { return "fake" }
+
+var job = JobSpec{
+	Title: "Programme Officer",
+	RequiredExperience: []string{
+		"3+ years delivering entrepreneurship programmes",
+		"Experience training SME owners",
+		"Experience with monitoring and evaluation",
+		"Experience managing partner relationships",
+		"Experience with donor reporting",
+	},
+	RequiredEducation: []string{"Bachelor's degree in Business or related field"},
+	RequiredDuties:    []string{"Deliver business training", "Track participant outcomes"},
+}
+
+// Fix 1: the prompt must use the real current date, not 22 November 2025.
+func TestPromptUsesCurrentDate(t *testing.T) {
+	now := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
+	p := BuildPrompt(Input{Job: job, CVText: "cv"}, now)
+	if !strings.Contains(p, "12 November 2026") {
+		t.Fatal("prompt does not contain today's date")
+	}
+	if strings.Contains(p, "2025-11-22") || strings.Contains(p, "November 22, 2025") {
+		t.Fatal("prompt still contains the old hardcoded date")
 	}
 }
 
-// TestSanitizeUTF8_InvalidString tests that invalid UTF-8 sequences are fixed
-func TestSanitizeUTF8_InvalidString(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		contains string // String should contain this after sanitization
-	}{
-		{
-			name:     "Invalid UTF-8 byte sequence at start",
-			input:    string([]byte{0xFF, 0xFE}) + "Valid text",
-			contains: "Valid text",
-		},
-		{
-			name:     "Invalid UTF-8 byte sequence in middle",
-			input:    "Start " + string([]byte{0xFF, 0xFE}) + " End",
-			contains: "Start",
-		},
-		{
-			name:     "Multiple invalid sequences",
-			input:    string([]byte{0xFF}) + "Text" + string([]byte{0xFE}) + "More",
-			contains: "Text",
-		},
-		{
-			name:     "Invalid continuation bytes",
-			input:    "Name: John" + string([]byte{0x80, 0x81}),
-			contains: "Name: John",
-		},
+// Fix 3: every required item must reach the model (previously only the first 3).
+func TestPromptIncludesAllRequiredItems(t *testing.T) {
+	p := BuildPrompt(Input{Job: job, CVText: "cv"}, time.Now())
+	for _, item := range append(append(job.RequiredExperience, job.RequiredEducation...), job.RequiredDuties...) {
+		if !strings.Contains(p, item) {
+			t.Errorf("required item missing from prompt: %q", item)
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Verify input is actually invalid
-			if utf8.ValidString(tt.input) {
-				t.Skip("Test input is valid UTF-8, skipping")
-			}
-
-			result := sanitizeUTF8(tt.input)
-
-			// Result must be valid UTF-8
-			if !utf8.ValidString(result) {
-				t.Errorf("sanitizeUTF8() returned invalid UTF-8 string: %q", result)
-			}
-
-			// Result should be non-empty
-			if len(result) == 0 {
-				t.Errorf("sanitizeUTF8() returned empty string")
-			}
-		})
+	if strings.Contains(p, "(+2 more)") {
+		t.Error("required list was truncated")
 	}
 }
 
-// TestSanitizeUTF8_PreservesContent tests that sanitization preserves meaningful content
-func TestSanitizeUTF8_PreservesContent(t *testing.T) {
-	// Create a string with invalid UTF-8 in the middle
-	validPart1 := "Education: Bachelor of Science in Computer Science"
-	validPart2 := "Experience: 5 years in software development"
-	invalidBytes := []byte{0xFF, 0xFE}
-	input := validPart1 + string(invalidBytes) + validPart2
-
-	result := sanitizeUTF8(input)
-
-	// Result must be valid UTF-8
-	if !utf8.ValidString(result) {
-		t.Errorf("sanitizeUTF8() returned invalid UTF-8 string")
-	}
-
-	// Result should be non-empty
-	if len(result) == 0 {
-		t.Errorf("sanitizeUTF8() returned empty string")
-	}
-
-	// Result length should be reasonable (not much shorter than input)
-	// Allow for replacement characters
-	if len(result) < len(input)-10 {
-		t.Errorf("sanitizeUTF8() removed too much content: input %d bytes, output %d bytes", len(input), len(result))
+func TestPromptIncludesTimelineAndAnswers(t *testing.T) {
+	p := BuildPrompt(Input{Job: job, CVText: "cv", Timeline: "TIMELINE-MARKER",
+		Answers: []QA{{Question: "Why Sinapis?", Answer: "ANSWER-MARKER"}}}, time.Now())
+	if !strings.Contains(p, "TIMELINE-MARKER") || !strings.Contains(p, "ANSWER-MARKER") {
+		t.Fatal("timeline or answers missing from prompt")
 	}
 }
 
-// TestSanitizeUTF8_ReplacementCharacter tests that invalid sequences are replaced with �
-func TestSanitizeUTF8_ReplacementCharacter(t *testing.T) {
-	// Create a string with a single invalid byte
-	invalidByte := []byte{0xFF}
-	input := "Before" + string(invalidByte) + "After"
-
-	result := sanitizeUTF8(input)
-
-	// Result must be valid UTF-8
-	if !utf8.ValidString(result) {
-		t.Errorf("sanitizeUTF8() returned invalid UTF-8 string")
-	}
-
-	// Result should contain the text before and after
-	if !strings.Contains(result, "Before") || !strings.Contains(result, "After") {
-		t.Errorf("sanitizeUTF8() did not preserve valid text: got %q", result)
-	}
-
-	// Result should contain the replacement character
-	if !strings.Contains(result, "�") {
-		t.Errorf("sanitizeUTF8() did not include replacement character")
-	}
-}
-
-// TestTruncate tests the truncate helper function
-func TestTruncate(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		maxLen int
-		want   string
-	}{
-		{
-			name:   "Short string not truncated",
-			input:  "Hello",
-			maxLen: 10,
-			want:   "Hello",
-		},
-		{
-			name:   "Exact length not truncated",
-			input:  "Hello",
-			maxLen: 5,
-			want:   "Hello",
-		},
-		{
-			name:   "Long string truncated",
-			input:  "This is a very long string that should be truncated",
-			maxLen: 20,
-			want:   "This is a very long ...",
-		},
-		{
-			name:   "Empty string",
-			input:  "",
-			maxLen: 10,
-			want:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := truncate(tt.input, tt.maxLen)
-			if result != tt.want {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.want)
-			}
-		})
-	}
-}
-
-// TestParseScores_DirectJSON tests parsing of pure JSON responses
-func TestParseScores_DirectJSON(t *testing.T) {
-	scorer := &Scorer{}
-
-	validJSON := `{
-		"experience_score": 45.5,
-		"experience_reasoning": "Strong experience",
-		"education_score": 18.0,
-		"education_reasoning": "Excellent education",
-		"duties_score": 19.0,
-		"duties_reasoning": "Well matched",
-		"cover_letter_score": 8.5,
-		"cover_letter_reasoning": "Good cover letter"
-	}`
-
-	scores, err := scorer.parseScores(validJSON)
+// Fix 2: out-of-range scores are clamped and the total recomputed.
+func TestScoresAreClamped(t *testing.T) {
+	ai := &fakeAI{answer: `{"experience_score": 65, "experience_reasoning": "x",
+		"education_score": -5, "education_reasoning": "y",
+		"duties_score": 25, "duties_reasoning": "z",
+		"cover_letter_score": 12, "cover_letter_reasoning": "w", "total_score": 140}`}
+	s := &Scorer{AI: ai, Now: time.Now}
+	r, err := s.Score(context.Background(), Input{Job: job, CVText: "cv", CoverText: "letter"})
 	if err != nil {
-		t.Fatalf("parseScores() failed: %v", err)
+		t.Fatal(err)
 	}
-
-	if scores.ExperienceScore != 45.5 {
-		t.Errorf("ExperienceScore = %v, want 45.5", scores.ExperienceScore)
+	if r.Experience != 50 || r.Education != 0 || r.Duties != 20 || r.CoverLetter != 10 {
+		t.Fatalf("not clamped: %+v", r)
 	}
-	if scores.EducationScore != 18.0 {
-		t.Errorf("EducationScore = %v, want 18.0", scores.EducationScore)
+	if r.Total != 80 {
+		t.Fatalf("total should be recomputed as 80, got %v", r.Total)
 	}
-	if scores.DutiesScore != 19.0 {
-		t.Errorf("DutiesScore = %v, want 19.0", scores.DutiesScore)
+	if !r.Clamped {
+		t.Error("Clamped flag not set")
 	}
-	if scores.CoverLetterScore != 8.5 {
-		t.Errorf("CoverLetterScore = %v, want 8.5", scores.CoverLetterScore)
-	}
-}
-
-// TestCondenseRequirements tests requirement condensing logic
-func TestCondenseRequirements(t *testing.T) {
-	scorer := &Scorer{}
-
-	tests := []struct {
-		name     string
-		category string
-		items    []string
-		maxItems int
-		want     string
-	}{
-		{
-			name:     "Empty list",
-			category: "Experience",
-			items:    []string{},
-			maxItems: 3,
-			want:     "",
-		},
-		{
-			name:     "Less than max items",
-			category: "Education",
-			items:    []string{"Bachelor's degree", "Master's degree"},
-			maxItems: 3,
-			want:     "Education: Bachelor's degree; Master's degree\n",
-		},
-		{
-			name:     "Exactly max items",
-			category: "Duties",
-			items:    []string{"Task 1", "Task 2", "Task 3"},
-			maxItems: 3,
-			want:     "Duties: Task 1; Task 2; Task 3\n",
-		},
-		{
-			name:     "More than max items",
-			category: "Experience",
-			items:    []string{"Exp 1", "Exp 2", "Exp 3", "Exp 4", "Exp 5"},
-			maxItems: 3,
-			want:     "Experience: Exp 1; Exp 2; Exp 3 (+2 more)\n",
-		},
-		{
-			name:     "Single item",
-			category: "Education",
-			items:    []string{"PhD in Computer Science"},
-			maxItems: 3,
-			want:     "Education: PhD in Computer Science\n",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := scorer.condenseRequirements(tt.category, tt.items, tt.maxItems)
-			if result != tt.want {
-				t.Errorf("condenseRequirements() = %q, want %q", result, tt.want)
-			}
-		})
+	if r.Band != "Good match" {
+		t.Errorf("band = %q", r.Band)
 	}
 }
 
-// TestBuildScoringPrompt_ContentTruncation tests that CV and cover letter are truncated
-func TestBuildScoringPrompt_ContentTruncation(t *testing.T) {
-	scorer := &Scorer{}
-
-	// Create long CV content (> 15000 chars) and long CL (> 5000 chars)
-	longCV := strings.Repeat("This is CV content. ", 800)           // ~16,000 chars
-	longCL := strings.Repeat("This is cover letter content. ", 200) // ~6,000 chars
-
-	applicant := models.ApplicantDocument{
-		Name:      "John Doe",
-		CVContent: longCV,
-		CLContent: longCL,
+func TestNoCoverLetterScoresZero(t *testing.T) {
+	ai := &fakeAI{answer: `{"experience_score": 30, "experience_reasoning": "x", "education_score": 10,
+		"education_reasoning": "y", "duties_score": 10, "duties_reasoning": "z", "cover_letter_score": 7}`}
+	r, err := (&Scorer{AI: ai}).Score(context.Background(), Input{Job: job, CVText: "cv"})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	jobDesc := models.JobDescription{
-		Title:              "Software Engineer",
-		Description:        "A great job",
-		RequiredExperience: []string{"Go", "Python", "Java"},
-	}
-
-	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
-
-	// Check that CV was truncated
-	if !strings.Contains(prompt, "[CV truncated for length]") {
-		t.Error("Expected CV to be truncated but truncation message not found")
-	}
-
-	// Check that cover letter was truncated
-	if !strings.Contains(prompt, "[Cover letter truncated for length]") {
-		t.Error("Expected cover letter to be truncated but truncation message not found")
-	}
-
-	// Ensure prompt is reasonably sized (should be much less than original content)
-	// Note: With comprehensive scoring instructions added, prompt is now longer (~22-25k chars)
-	if len(prompt) > 30000 {
-		t.Errorf("Prompt still too long: %d bytes", len(prompt))
+	if r.CoverLetter != 0 || r.Total != 50 {
+		t.Fatalf("cover letter should be 0 when none provided: %+v", r)
 	}
 }
 
-// TestBuildScoringPrompt_NoTruncationNeeded tests that short content is not truncated
-func TestBuildScoringPrompt_NoTruncationNeeded(t *testing.T) {
-	scorer := &Scorer{}
-
-	applicant := models.ApplicantDocument{
-		Name:      "Jane Smith",
-		CVContent: "Short CV content",
-		CLContent: "Short cover letter",
+func TestMarkdownFencedJSONIsParsed(t *testing.T) {
+	ai := &fakeAI{answer: "```json\n{\"experience_score\": 40, \"experience_reasoning\": \"ok\", \"education_score\": 15, \"education_reasoning\": \"ok\", \"duties_score\": 15, \"duties_reasoning\": \"ok\", \"cover_letter_score\": 5, \"cover_letter_reasoning\": \"ok\", \"required_checks\": [{\"requirement\": \"a\", \"met\": \"YES\"}, {\"requirement\": \"b\", \"met\": \"maybe\"}]}\n```"}
+	r, err := (&Scorer{AI: ai}).Score(context.Background(), Input{Job: job, CVText: "cv", CoverText: "x"})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	jobDesc := models.JobDescription{
-		Title:              "Data Analyst",
-		Description:        "Analyze data",
-		RequiredExperience: []string{"SQL", "Excel"},
+	if r.Total != 75 {
+		t.Fatalf("total = %v", r.Total)
 	}
-
-	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
-
-	// Check that content was NOT truncated
-	if strings.Contains(prompt, "[CV truncated for length]") {
-		t.Error("CV should not be truncated for short content")
-	}
-
-	if strings.Contains(prompt, "[Cover letter truncated for length]") {
-		t.Error("Cover letter should not be truncated for short content")
-	}
-
-	// Ensure original content is present
-	if !strings.Contains(prompt, "Short CV content") {
-		t.Error("Original CV content not found in prompt")
-	}
-
-	if !strings.Contains(prompt, "Short cover letter") {
-		t.Error("Original cover letter content not found in prompt")
+	if r.RequiredChecks[0].Met != "yes" || r.RequiredChecks[1].Met != "no" {
+		t.Fatalf("met values not normalised: %+v", r.RequiredChecks)
 	}
 }
 
-// TestParseScores_JSONWithExtraText tests parsing of JSON with surrounding text
-func TestParseScores_JSONWithExtraText(t *testing.T) {
-	scorer := &Scorer{}
-
-	tests := []struct {
-		name     string
-		response string
-		wantExp  float64
-		wantErr  bool
-	}{
-		{
-			name: "JSON with text before",
-			response: `Here are the scores:
-{
-	"experience_score": 40.0,
-	"experience_reasoning": "Good",
-	"education_score": 15.0,
-	"education_reasoning": "Adequate",
-	"duties_score": 18.0,
-	"duties_reasoning": "Strong",
-	"cover_letter_score": 7.0,
-	"cover_letter_reasoning": "Good"
-}`,
-			wantExp: 40.0,
-			wantErr: false,
-		},
-		{
-			name: "JSON with text after",
-			response: `{
-	"experience_score": 35.0,
-	"experience_reasoning": "Fair",
-	"education_score": 12.0,
-	"education_reasoning": "Basic",
-	"duties_score": 16.0,
-	"duties_reasoning": "Acceptable",
-	"cover_letter_score": 6.0,
-	"cover_letter_reasoning": "Average"
-}
-Hope this helps!`,
-			wantExp: 35.0,
-			wantErr: false,
-		},
-		{
-			name: "JSON with markdown code blocks",
-			response: "```json\n" + `{
-	"experience_score": 42.0,
-	"experience_reasoning": "Very good",
-	"education_score": 17.0,
-	"education_reasoning": "Strong",
-	"duties_score": 19.0,
-	"duties_reasoning": "Excellent",
-	"cover_letter_score": 9.0,
-	"cover_letter_reasoning": "Outstanding"
-}` + "\n```",
-			wantExp: 42.0,
-			wantErr: false,
-		},
-		{
-			name:     "No JSON in response",
-			response: "This response has no JSON object",
-			wantErr:  true,
-		},
-		{
-			name:     "Invalid JSON",
-			response: "{ invalid json }",
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			scores, err := scorer.parseScores(tt.response)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("parseScores() expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("parseScores() failed: %v", err)
-				}
-				if scores.ExperienceScore != tt.wantExp {
-					t.Errorf("ExperienceScore = %v, want %v", scores.ExperienceScore, tt.wantExp)
-				}
-			}
-		})
+func TestEmptyScoresAreAnError(t *testing.T) {
+	ai := &fakeAI{answer: `{}`}
+	if _, err := (&Scorer{AI: ai}).Score(context.Background(), Input{Job: job, CVText: "cv"}); err == nil {
+		t.Fatal("expected error for empty scores")
 	}
 }
 
-// TestBuildScoringPrompt_ContainsCriticalInstructions tests that the prompt includes comprehensive scoring instructions
-func TestBuildScoringPrompt_ContainsCriticalInstructions(t *testing.T) {
-	scorer := &Scorer{}
-
-	applicant := models.ApplicantDocument{
-		Name:      "Test Applicant",
-		CVContent: "Sample CV content",
-		CLContent: "Sample cover letter",
+func TestSanitizeUTF8(t *testing.T) {
+	bad := "Jos\xe9 G\xf3mez"
+	if got := sanitizeUTF8(bad); !utf8.ValidString(got) {
+		t.Fatalf("still invalid: %q", got)
 	}
-
-	jobDesc := models.JobDescription{
-		Title:              "Loan Officer",
-		Description:        "A lending position",
-		RequiredExperience: []string{"5+ years in lending", "Microfinance experience"},
-	}
-
-	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
-
-	// Check for critical sections
-	criticalSections := []string{
-		"CRITICAL SCORING INSTRUCTIONS",
-		"CURRENT DATE FOR REFERENCE: November 22, 2025",
-		"### 1. DATE EXTRACTION RULES",
-		"Duration Calculation:",
-		"Formula: Duration (months) = (End Year - Start Year) × 12 + (End Month - Start Month)",
-		"### 2. CV DOCUMENT SCANNING RULES",
-		"### 3. JOB TITLE RELEVANCE CHECKING",
-		"### 4. EXPERIENCE SCORING (0-50 points)",
-		"Duration Tiers (for RELEVANT experience only):",
-		"0-6 months: Entry-level → 18-24/50",
-		"60+ months: Expert → 45-50/50",
-		"### 5. ACCURACY CHECKS",
-		"Example A:",
-		"08/2025-Present",
-		"3 months",
-		"Example B:",
-		"Supply Chain Manager",
-		"NOT RELEVANT",
-		"Example C:",
-		"Microfinance Officer",
-		"7 years",
-	}
-
-	for _, section := range criticalSections {
-		if !strings.Contains(prompt, section) {
-			t.Errorf("Prompt missing critical section: %q", section)
-		}
-	}
-
-	// Verify prompt is reasonable length (should be > 5000 chars with all instructions)
-	if len(prompt) < 5000 {
-		t.Errorf("Prompt unexpectedly short: %d chars (expected >5000)", len(prompt))
+	if got := sanitizeUTF8("José — 软件"); got != "José — 软件" {
+		t.Fatalf("valid string changed: %q", got)
 	}
 }
 
-// TestBuildScoringPrompt_DateCalculationExamples tests that date calculation examples are present
-func TestBuildScoringPrompt_DateCalculationExamples(t *testing.T) {
-	scorer := &Scorer{}
-
-	applicant := models.ApplicantDocument{
-		Name:      "Test Applicant",
-		CVContent: "Sample CV",
-	}
-
-	jobDesc := models.JobDescription{
-		Title:              "Credit Officer",
-		Description:        "Credit position",
-		RequiredExperience: []string{"Credit analysis experience"},
-	}
-
-	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
-
-	// Check for specific date calculation examples
-	dateExamples := []string{
-		"02/2021 to 06/2025",
-		"(2025-2021)×12 + (6-2) = 48+4 = 52 months",
-		"08/2025 to Present",
-		"(2025-2025)×12 + (11-8) = 0+3 = 3 months",
-		"2018 to Present",
-		"(2025-2018)×12 + (11-1) = 84+10 = 94 months",
-	}
-
-	for _, example := range dateExamples {
-		if !strings.Contains(prompt, example) {
-			t.Errorf("Prompt missing date calculation example: %q", example)
+func TestBands(t *testing.T) {
+	for total, want := range map[float64]string{90: "Strong match", 85: "Strong match", 70: "Good match", 60: "Possible match", 20: "Weak match"} {
+		if got := Band(total); got != want {
+			t.Errorf("Band(%v) = %q, want %q", total, got, want)
 		}
 	}
 }
 
-// TestBuildScoringPrompt_ContextAwareKeywords tests that context-aware keyword validation is present
-func TestBuildScoringPrompt_ContextAwareKeywords(t *testing.T) {
-	scorer := &Scorer{}
-
-	applicant := models.ApplicantDocument{
-		Name:      "Test Applicant",
-		CVContent: "Sample CV",
+func TestDemoHandler(t *testing.T) {
+	out, err := DemoHandler(llm.Request{Hint: Input{Job: job, CVText: "Delivered entrepreneurship programmes and business training to SME owners; monitoring and evaluation.", TotalMonths: 48}})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	jobDesc := models.JobDescription{
-		Title:              "Lending Officer",
-		Description:        "Lending position",
-		RequiredExperience: []string{"Lending experience"},
+	var r Result
+	if err := json.Unmarshal([]byte(out), &r); err != nil {
+		t.Fatal(err)
 	}
-
-	prompt := scorer.buildScoringPrompt(applicant, jobDesc)
-
-	// Check for context-aware keyword validation examples
-	contextExamples := []string{
-		"Critical: Keyword in wrong context ≠ Experience",
-		"❌ \"Negotiated credit terms with customers\" (sales) ≠ Loan officer",
-		"❌ \"Processed credit memos\" (accounting) ≠ Credit analyst",
-		"❌ \"Managed supplier credit\" (procurement) ≠ Lending officer",
+	r.finalise()
+	if r.Total <= 0 || r.Total > 100 {
+		t.Fatalf("demo total out of range: %v", r.Total)
 	}
-
-	for _, example := range contextExamples {
-		if !strings.Contains(prompt, example) {
-			t.Errorf("Prompt missing context-aware keyword example: %q", example)
-		}
+	if len(r.RequiredChecks) != len(job.RequiredExperience)+len(job.RequiredEducation)+len(job.RequiredDuties) {
+		t.Fatalf("expected a check per required item, got %d", len(r.RequiredChecks))
 	}
 }

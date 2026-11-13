@@ -1,0 +1,32 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · {{.OrgName}} Hiring</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/jobs"><span class="brand-mark">S</span> {{.OrgName}} Hiring</a>
+  {{if .SignedIn}}
+  <nav class="mainnav">
+    <a href="/jobs" {{if eq .Path "/jobs"}}aria-current="page"{{end}}>Jobs</a>
+    {{if .User.CanManageJobs}}<a href="/settings" {{if eq .Path "/settings"}}aria-current="page"{{end}}>Settings</a>{{end}}
+    {{if .User.IsAdmin}}<a href="/admin/users" {{if eq .Path "/admin/users"}}aria-current="page"{{end}}>People</a>{{end}}
+    <a href="/careers" target="_blank" rel="noopener">Careers page ↗</a>
+  </nav>
+  <div class="who">
+    <span>{{.User.DisplayName}} <small>{{roleLabel .User.Role}}</small></span>
+    <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="linkbtn">Sign out</button></form>
+  </div>
+  {{end}}
+</header>
+{{if .DemoAI}}<div class="demo-banner">Demo AI mode: scores come from simple keyword matching, not Gemini. Don't use them for real decisions.</div>{{end}}
+<main class="container">
+  {{if .Flash}}<div class="flash flash-{{.FlashKind}}" role="status">{{.Flash}}</div>{{end}}
+  {{template "content" .}}
+</main>
+</body>
+</html>{{end}}

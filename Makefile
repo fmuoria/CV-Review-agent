@@ -1,62 +1,26 @@
-.PHONY: build run test clean fmt vet help build-gui
+# Common tasks. On Windows, run these from Git Bash.
+DB ?= postgres://ats:ats@localhost:5432/ats?sslmode=disable
+TEST_DB ?= postgres://ats:ats@localhost:5432/ats_test?sslmode=disable
 
-# Build the CLI application
+.PHONY: run test test-db build fmt vet up
+
+run:            ## Run the server locally (reads .env if you export it first)
+	DATABASE_URL="$(DB)" go run ./cmd/server
+
+test:           ## Unit tests (no database needed)
+	go test ./...
+
+test-db:        ## Unit + database integration tests
+	TEST_DATABASE_URL="$(TEST_DB)" go test ./...
+
 build:
-	@echo "Building CV Review Agent CLI..."
-	@go build -o cv-review-agent .
-	@echo "Build complete: cv-review-agent"
+	go build -o bin/server ./cmd/server
 
-# Build the GUI application (requires system dependencies)
-build-gui:
-	@echo "Building CV Review Agent GUI..."
-	@echo "Note: Requires system dependencies for Fyne (see SETUP.md)"
-	@go build -o cmd/gui/cv-review-agent-gui cmd/gui/main.go
-	@echo "Build complete: cmd/gui/cv-review-agent-gui"
-
-# Run the application
-run:
-	@echo "Starting CV Review Agent..."
-	@go run main.go
-
-# Run tests (excluding GUI which requires system dependencies)
-test:
-	@echo "Running tests..."
-	@go test -v ./internal/ingestion/... ./internal/models/... ./internal/agent/... ./internal/api/... ./internal/config/... ./internal/export/...
-
-# Clean build artifacts
-clean:
-	@echo "Cleaning build artifacts..."
-	@rm -f cv-review-agent
-	@rm -rf uploads/
-	@echo "Clean complete"
-
-# Format code
 fmt:
-	@echo "Formatting code..."
-	@go fmt ./...
-	@echo "Formatting complete"
+	gofmt -s -w .
 
-# Run go vet
 vet:
-	@echo "Running go vet..."
-	@go vet ./...
-	@echo "Vet complete"
+	go vet ./...
 
-# Install dependencies
-deps:
-	@echo "Installing dependencies..."
-	@go mod download
-	@go mod tidy
-	@echo "Dependencies installed"
-
-# Show help
-help:
-	@echo "Available targets:"
-	@echo "  build  - Build the application"
-	@echo "  run    - Run the application"
-	@echo "  test   - Run tests"
-	@echo "  clean  - Clean build artifacts"
-	@echo "  fmt    - Format code"
-	@echo "  vet    - Run go vet"
-	@echo "  deps   - Install dependencies"
-	@echo "  help   - Show this help message"
+up:             ## Postgres + app in Docker (demo AI)
+	docker compose up --build

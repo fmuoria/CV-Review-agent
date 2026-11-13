@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1>Work with {{.OrgName}}</h1>
+<p class="lead">Join us in supporting entrepreneurs across Kenya, Uganda and Rwanda.</p>
+{{if not .Data.Jobs}}
+  <section class="card empty"><h2>No open roles right now</h2><p>Please check back soon.</p></section>
+{{else}}
+  {{$src := .Data.Src}}
+  {{range .Data.Jobs}}
+  <a class="card joblink" href="/careers/{{.Slug}}?src={{$src}}">
+    <h2>{{.Title}}</h2>
+    <p class="muted">{{.Location}}{{if .EmploymentType}} · {{.EmploymentType}}{{end}}{{if .ClosesOn}} · Apply by {{date .ClosesOn}}{{end}}</p>
+    {{with .Summary}}<p>{{.}}</p>{{end}}
+  </a>
+  {{end}}
+{{end}}
+{{end}}

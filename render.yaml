@@ -1,0 +1,61 @@
+# Render Blueprint: one web service (dashboard + careers pages + screening
+# workers) and one Postgres database. In Render: New → Blueprint → pick this repo.
+# Values marked "sync: false" are asked for in the Render dashboard — see docs/SETUP.md.
+services:
+  - type: web
+    name: sinapis-ats
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: frankfurt          # closest Render region to East Africa
+    plan: starter              # paid plan: free instances sleep and lose the disk
+    healthCheckPath: /healthz
+    disk:
+      name: ats-files
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sinapis-ats-db
+          property: connectionString
+      - key: APP_SECRET
+        generateValue: true    # keep this value: it encrypts the Gmail connection
+      - key: BASE_URL
+        sync: false            # e.g. https://sinapis-ats.onrender.com or https://careers.sinapis.org
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ALLOWED_EMAIL_DOMAIN
+        value: sinapis.org
+      - key: ADMIN_EMAILS
+        sync: false            # comma-separated; these accounts become admins on first sign-in
+      - key: LLM_PROVIDER
+        value: vertex
+      - key: LLM_MODEL
+        value: gemini-2.5-flash
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CLOUD_LOCATION
+        value: us-central1
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false            # paste the whole service-account key JSON
+      - key: STORAGE_BACKEND
+        value: local           # files on the Render disk; switch to gcs + GCS_BUCKET later if you prefer
+      - key: STORAGE_DIR
+        value: /var/data/files
+      - key: TIMEZONE
+        value: Africa/Nairobi
+      - key: PRIVACY_CONTACT_EMAIL
+        sync: false
+      - key: SCREENING_WORKERS
+        value: "2"
+
+databases:
+  - name: sinapis-ats-db
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: sinapis_ats
+    user: sinapis_ats

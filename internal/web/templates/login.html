@@ -1,0 +1,27 @@
+{{define "content"}}
+<section class="card login">
+  <h1>Sign in</h1>
+  <p class="muted">For {{.OrgName}} HR and hiring managers.</p>
+  {{with .Data.Error}}<div class="flash flash-error">{{.}}</div>{{end}}
+  {{if .Data.Google}}
+    <a class="btn btn-primary btn-wide" href="/auth/google?next={{.Data.Next}}">Sign in with Google</a>
+    {{with .Data.Domain}}<p class="muted small">Use your @{{.}} account.</p>{{end}}
+  {{else}}
+    <p class="muted">Google sign-in isn't configured yet (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET).</p>
+  {{end}}
+  {{if .Data.DevMode}}
+  <details class="devlogin" {{if not .Data.Google}}open{{end}}>
+    <summary>Development sign-in</summary>
+    <p class="small muted">Only available when APP_ENV is not "production". New emails are created with the role you choose.</p>
+    <form method="post" action="/dev/login" class="stack">
+      <input type="hidden" name="next" value="{{.Data.Next}}">
+      <label>Email <input type="email" name="email" required placeholder="you@sinapis.org"></label>
+      <label>Role (for new accounts)
+        <select name="role"><option value="admin">Admin</option><option value="hr">HR</option><option value="hiring_manager">Hiring manager</option></select>
+      </label>
+      <button class="btn">Sign in (dev)</button>
+    </form>
+  </details>
+  {{end}}
+</section>
+{{end}}
